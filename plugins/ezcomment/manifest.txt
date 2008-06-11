@@ -1,0 +1,5 @@
+Folder: ezcomment
+Name: EZ-Comment
+Version: 1.00
+Ped-Version-Min: 2.30
+Ped-Version-Max: 2.30
