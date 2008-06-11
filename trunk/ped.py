@@ -1,7 +1,7 @@
 #
 # ped.py
 #
-# Nokia S60 on-phone Python IDE.
+# Python IDE for Nokia S60 platform.
 #
 # Copyright (c) 2007-2008, Arkadiusz Wahlig
 # <arkadiusz.wahlig@gmail.com>
@@ -1491,16 +1491,21 @@ class PluginsWindow(Window):
             for name in os.listdir(self.plugins_path):
                 path = os.path.join(self.plugins_path, name)
                 f = file(os.path.join(path, 'manifest.txt'))
-                plugins.append((path, parse_manifest(f.read().decode('utf8'))))
+                plugins.append((path, name, parse_manifest(f.read().decode('utf8'))))
                 f.close()
         if plugins:
             plugins.sort(lambda a, b: -(a[1]['name'].lower() < b[1]['name'].lower()))
-            lst = [(x[1]['name'],
-                    unicode(_(u'Version: %s') % x[1]['version'])) for x in plugins]
+            lst = []
+            for path, name, manifest in plugins:
+                if name in self.started_plugins:
+                    descr = _('Version: %s') % manifest['version']
+                else:
+                    descr = _('Restart Ped to start this plugin')
+                lst.append((manifest['name'], unicode(descr)))
             self.menu = self.menu_plugins
             self.popup_menu = self.popup_menu_plugins
         else:
-            lst = [(unicode(_(u'(no plugins)')), u'')]
+            lst = [(unicode(_('(no plugins)')), u'')]
             self.menu = self.menu_empty
             self.popup_menu = self.popup_menu_empty
         self.body.set_list(lst, 0)
@@ -1515,14 +1520,14 @@ class PluginsWindow(Window):
         path, manifest = self.plugins[self.body.current()]
         bwin = ui.screen.create_blank_window(_('Please wait...'))
         path = os.path.join(path, 'help')
-        helpfile = os.path.join(path, app.settings['language'].get())
+        helpfile = os.path.join(path, self.language.encode('utf8'))
         if not os.path.exists(helpfile):
             helpfile = os.path.join(path, 'English')
         try:
             win = ui.screen.create_window(HelpWindow,
                     path=helpfile,
                     title=_('Help for %s') % manifest['name'])
-            win.body.add((u'%s\n' + _(u'Version: %s') + u'\n\n') % (manifest['name'], manifest['version']))
+            win.body.add((u'%s\n' + unicode(_('Version: %s')) + u'\n\n') % (manifest['name'], manifest['version']))
             win.body.set_pos(0)
             win.focus = True
         except IOError:
@@ -1692,6 +1697,7 @@ class Application(object):
         # properties initialization
         self.browser_win = self.help_win = self.plugins_win = None
         self.unnamed_count = 1
+        self.started_plugins = []
 
     def start(self):
         # load settings
@@ -1719,8 +1725,8 @@ class Application(object):
         main_menu.append(ui.MenuItem(_('Help'), target=self.help_click))
         # BEG: temporary
         m = ui.Menu()
-        m.append(ui.MenuItem('ui', target=lambda: ui.translator.save(os.path.join(self.path, 'lang-ui'))))
-        m.append(ui.MenuItem('ped', target=lambda: translator.save(os.path.join(self.path, 'lang-ped'))))
+        m.append(ui.MenuItem('ui', target=lambda: ui.translator.save('e:\\lang-ui')))
+        m.append(ui.MenuItem('ped', target=lambda: translator.save('e:\\lang-ped')))
         main_menu.append(ui.MenuItem(_('Dump lang'), submenu=m))
         # END: temporary
         main_menu.append(ui.MenuItem(_('Exit'), target=ui.screen.rootwin.close))
@@ -1770,6 +1776,7 @@ class Application(object):
 
     def start_plugins(self):
         plugins_path = os.path.join(self.path, 'plugins')
+        self.started_plugins = []
         if os.path.exists(plugins_path):
             slen = len(self.settings)
             for name in os.listdir(plugins_path):
@@ -1790,6 +1797,7 @@ class Application(object):
                     ns.update(__main__.__builtins__.__dict__)
                     ns['__name__'] = '__main__'
                     execfile(filename, ns)
+                    self.started_plugins.append(name)
                 except:
                     from traceback import print_exc
                     print_exc()
