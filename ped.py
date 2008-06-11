@@ -35,7 +35,7 @@
 
 
 # application version
-__version__ = '2.20 beta'
+__version__ = '2.30 beta'
 
 
 import sys
@@ -1838,8 +1838,8 @@ class Application(object):
             self.help_win.focus = True
             return
         bwin = ui.screen.create_blank_window(_('Please wait...'))
-        path = os.path.join(self.path, 'help')
-        helpfile = os.path.join(path, self.settings['language'].get())
+        path = os.path.join(self.path, 'lang\\help')
+        helpfile = os.path.join(path, self.language.encode('utf8'))
         if not os.path.exists(helpfile):
             helpfile = os.path.join(path, 'English')
         try:

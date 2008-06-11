@@ -9,7 +9,7 @@ import sys
 import getopt
 
 # Version (major, minor, build)
-version = (2, 20, 0)
+version = (2, 30, 0)
 version_tail = 'beta'
 
 # python 2.2 binary path
