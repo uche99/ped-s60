@@ -1493,21 +1493,26 @@ class PluginsWindow(Window):
                 f = file(os.path.join(path, 'manifest.txt'))
                 plugins.append((path, name, parse_manifest(f.read().decode('utf8'))))
                 f.close()
+        plugins.sort(lambda a, b: -(a[1]['name'].lower() < b[1]['name'].lower()))
+        lst = []
+        started = list(app.started_plugins)
+        for path, name, manifest in plugins:
+            if name in started:
+                started.remove(name)
+                descr = _('Running.')
+            else:
+                descr = _('Installed. Restart Ped to run.')
+            lst.append((u'%s %s' % (manifest['name'], manifest['version']), unicode(descr)))
+        for name in started:
+            lst.append((unicode(name), unicode(_('Uninstalled. Restart to stop.'))))
         if plugins:
-            plugins.sort(lambda a, b: -(a[1]['name'].lower() < b[1]['name'].lower()))
-            lst = []
-            for path, name, manifest in plugins:
-                if name in self.started_plugins:
-                    descr = _('Version: %s') % manifest['version']
-                else:
-                    descr = _('Restart Ped to start this plugin')
-                lst.append((manifest['name'], unicode(descr)))
             self.menu = self.menu_plugins
             self.popup_menu = self.popup_menu_plugins
         else:
-            lst = [(unicode(_('(no plugins)')), u'')]
             self.menu = self.menu_empty
             self.popup_menu = self.popup_menu_empty
+        if not lst:
+            lst.append((unicode(_('(no plugins)')), u''))
         self.body.set_list(lst, 0)
         self.plugins = plugins
 
@@ -1517,10 +1522,14 @@ class PluginsWindow(Window):
             item.target()
 
     def help_click(self):
-        path, manifest = self.plugins[self.body.current()]
+        try:
+            path, name, manifest = self.plugins[self.body.current()]
+        except IndexError:
+            ui.note(unicode(_('Not available!')), 'error')
+            return
         bwin = ui.screen.create_blank_window(_('Please wait...'))
         path = os.path.join(path, 'help')
-        helpfile = os.path.join(path, self.language.encode('utf8'))
+        helpfile = os.path.join(path, app.language.encode('utf8'))
         if not os.path.exists(helpfile):
             helpfile = os.path.join(path, 'English')
         try:
@@ -1544,7 +1553,8 @@ class PluginsWindow(Window):
         try:
             self.uninstall(self.plugins[self.body.current()][0])
         except IndexError:
-            pass
+            ui.note(unicode(_('Not available!')), 'error')
+            return
 
     def install(self, filename):
         import zipfile
