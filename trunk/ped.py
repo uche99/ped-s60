@@ -4,7 +4,7 @@
 # Nokia S60 on-phone Python IDE.
 #
 # Copyright (c) 2007-2008, Arkadiusz Wahlig
-# <arkadiusz.wahlig@googlemail.com>
+# <arkadiusz.wahlig@gmail.com>
 #
 # All rights reserved.
 #
@@ -1848,8 +1848,8 @@ class Application(object):
             self.help_win.body.add(u'Ped - Python IDE\n'
                                    u'Version: %s\n'
                                    u'\n'
-                                   u'Copyright \u00a9 2007, 2008\nArkadiusz Wahlig\n'
-                                   u'<yak@nokix.pasjagsm.pl>\n'
+                                   u'Copyright \u00a9 2007-2008\nArkadiusz Wahlig\n'
+                                   u'<arkadiusz.wahlig@gmail.com>\n'
                                    u'\n' % __version__)
             self.help_win.body.set_pos(0)
             self.help_win.focus = True
