@@ -134,9 +134,10 @@ def submake(rules, name, build):
         if not go:
             if os.path.exists(name):
                 tim = os.stat(name).st_mtime
-                times = [os.stat(x).st_mtime for x in inputs]
-                if [x for x in times if x > tim]:
-                    go = True
+                for x in inputs:
+                    if os.stat(x).st_mtime > tim:
+                        go = True
+                        break
             else:
                 go = True
         del rules[name]
