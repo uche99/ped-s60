@@ -4,7 +4,7 @@
 # This module provides an abstraction layer for the PyS60 appuifw module.
 #
 # Copyright (c) 2007-2008, Arkadiusz Wahlig
-# <arkadiusz.wahlig@googlemail.com>
+# <arkadiusz.wahlig@gmail.com>
 #
 # All rights reserved.
 #
