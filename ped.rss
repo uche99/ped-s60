@@ -1,0 +1,17 @@
+// Ped.rss
+#include <aiftool.rh>
+
+RESOURCE AIF_DATA
+{
+caption_list=
+        {
+        CAPTION { code=ELangEnglish; caption="Ped"; },
+        CAPTION { code=ELangFrench; caption="Ped";}   // to work round an AIFTOOL bug, you need to have at least
+                                                                                              // one language mentioned here
+        };
+
+app_uid=0x2000C767;
+
+// Put here the number of icons (not including the masks)
+num_icons=2;
+} 
