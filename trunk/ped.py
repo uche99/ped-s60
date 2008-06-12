@@ -893,14 +893,15 @@ class PythonFileWindow(TextFileWindow, PythonModifier):
             menu = ui.Menu(_('Arguments'))
             if self.args:
                 menu.append(ui.MenuItem(_('Last: %s') % self.args, args=self.args))
-            menu.append(ui.MenuItem(_('Edit...'), args=self.args))
+            menu.append(ui.MenuItem(_('Edit...'), args=self.args, edit=True))
             menu.append(ui.MenuItem(_('No arguments'), args=u''))
             item = menu.popup()
             if not item:
                 return
-            if item.title.startswith('Edit'):
+            if getattr(item, 'edit', False):
                 args = ui.query(unicode(_('Arguments:')), 'text', item.args)
                 if not args:
+                    # cancel
                     return
                 item.args = args
             self.args = item.args
