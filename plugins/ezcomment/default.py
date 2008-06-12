@@ -25,13 +25,11 @@ def control_key_press(self, key):
         # check if there are '#' chars at cursor and remove them
         # or add one if there wren't any
         pos = self.body.get_pos()
-        while True:
-            char = self.body.get(pos, 1)
-            if char == '#':
+        if self.body.get(pos, 1) == u'#':
+            while self.body.get(pos, 1) == u'#':
                 self.body.delete(pos, 1)
-            else:
-                self.body.add(u'#')
-                break
+        else:
+            self.body.add(u'#')
         
         # find the start of next line and go there
         found = False
