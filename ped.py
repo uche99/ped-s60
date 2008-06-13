@@ -1979,7 +1979,10 @@ def quote_split(s):
     s += ' '
     ret = []
     for x in s.split('"'):
-        i = s.index(x)
+        if x:
+            i = s.index(x)
+        else:
+            i = s.index('""') + 1
         try:
             if s[i-1] == '"' and s[i+len(x)] == '"':
                 ret.append(x)
