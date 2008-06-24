@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1 Tiny//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11-tiny.dtd">
+<svg xmlns="http://www.w3.org/2000/svg" baseProfile="tiny" height="100%" version="1.0" viewBox="-6 -6 72.478721 72.966597" width="100%">
+<rect height="45.95948" ry="4.8960271" style="fill:#dbdee3;fill-opacity:1;stroke:none;stroke-width:0.46700001;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" width="32.692825" x="13.347205" y="7.9773674"/>
+<g transform="matrix(1.0999298,0,0,1.0999298,13.25769,7.7497402)">
+<g>
+<path d="M 4.368,7.895 L 25.908,7.895" style="fill:none;stroke:#1e3842;stroke-linecap:round"/>
+<path d="M 4.368,13.752 L 25.908,13.752" style="fill:none;stroke:#1e3842;stroke-linecap:round"/>
+<path d="M 4.368,19.609 L 25.908,19.609" style="fill:none;stroke:#1e3842;stroke-linecap:round"/>
+<path d="M 4.368,25.466 L 25.908,25.466" style="fill:none;stroke:#1e3842;stroke-linecap:round"/>
+<path d="M 4.368,31.323 L 13.426,31.323" style="fill:none;stroke:#1e3842;stroke-linecap:round"/>
+</g>
+<path d="M 0.808,1.395 L 0.741,4.772 L 3.848,0.449 L 0.876,1.125" style="fill:#1e3842"/>
+<path d="M 28.703,37.665 L 28.096,40.097 L 25.259,41.381 L 28.838,41.11 L 29.379,36.314 L 28.703,37.665 z" style="fill:#1e3842"/>
+<path d="M 29.527,36.878 C 29.527,42.308 29.093,41.796 24.05,41.796 L 6.775,41.796 C 1.732,41.796 1.558,42.31 1.558,36.878 L 1.558,6.738 C 1.558,1.306 1.733,1.468 6.775,1.468 L 24.05,1.468 C 29.096,1.468 29.529,1.306 29.529,6.738 L 29.529,36.878 L 29.527,36.878 z" style="fill:none;stroke:#1e3842"/>
+<path d="M 28.471,35.909 C 28.471,41.34 28.036,40.828 22.993,40.828 L 5.718,40.828 C 0.675,40.828 0.5,41.342 0.5,35.909 L 0.5,5.769 C 0.5,0.337 0.675,0.5 5.718,0.5 L 22.991,0.5 C 28.036,0.5 28.47,0.337 28.47,5.769 L 28.47,35.909 L 28.471,35.909 z" style="fill:none;stroke:#4f849f"/>
+<path d="M 3.715,6.858 L 25.254,6.858" style="fill:none;stroke:#4f849f;stroke-linecap:round"/>
+<path d="M 3.715,12.715 L 25.254,12.715" style="fill:none;stroke:#4f849f;stroke-linecap:round"/>
+<path d="M 3.715,18.573 L 25.254,18.573" style="fill:none;stroke:#4f849f;stroke-linecap:round"/>
+<path d="M 3.715,24.43 L 25.254,24.43" style="fill:none;stroke:#4f849f;stroke-linecap:round"/>
+<path d="M 3.715,30.287 L 12.774,30.287" style="fill:none;stroke:#4f849f;stroke-linecap:round"/>
+</g>
+</svg>

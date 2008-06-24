@@ -1,0 +1,7 @@
+/Hfile_browser_icons.mbg
+icons\mif\file_browser\drive.svg
+icons\mif\file_browser\empty.svg
+icons\mif\file_browser\folder.svg
+icons\mif\file_browser\info.svg
+icons\mif\file_browser\py.svg
+icons\mif\file_browser\txt.svg

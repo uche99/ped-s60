@@ -25,11 +25,14 @@ def main():
     
         # 'dstfile': (['srcfile1', 'srcfile2'], make_function),
 
-        'ped.mbm': (listdir('icons\\app'),
-            lambda: system('''bmconv icons\\app\\bmconv_input_file.txt''')),
+        'ped.mbm': (listdir('icons\\mbm\\app'),
+            lambda: system('''bmconv icons\\mbm\\app\\bmconv_input_file.txt''')),
         
-        'file_browser_icons.mbm': (listdir('icons\\file_browser'),
-            lambda: system('''bmconv icons\\file_browser\\bmconv_input_file.txt''')),
+        'file_browser_icons.mbm': (listdir('icons\\mbm\\file_browser'),
+            lambda: system('''bmconv icons\\mbm\\file_browser\\bmconv_input_file.txt''')),
+        
+        'file_browser_icons.mif': (listdir('icons\\mif\\file_browser'),
+            lambda: system('''mifconv file_browser_icons.mif /Ficons\\mif\\file_browser\\mifconv_input_file.txt''')),
         
         'ped.aif': (['ped.rss', 'ped.mbm'],
             lambda: system('aiftool ped ped.mbm')),
@@ -53,14 +56,15 @@ def main():
             lambda: build_sis_pre3('2ndEd')),
         
         'Ped_%s_3rdEd.sis' % verstr():
-            (['default.py', 'ped.pyo', 'ui.pyo', 'file_browser_icons.mbm', 'LICENSE'],
+            (['default.py', 'ped.pyo', 'ui.pyo', 'ped.svg', 'file_browser_icons.mif', 'LICENSE'],
             lambda: system('''copy default.py build_3rdEd\\
                            copy ped.pyo build_3rdEd\\ped.pyc
                            copy ui.pyo build_3rdEd\\ui.pyc
-                           copy file_browser_icons.mbm build_3rdEd\\
+                           copy file_browser_icons.mif build_3rdEd\\
                            copy LICENSE build_3rdEd\\
-                           %s py2sis --uid=0xA00042B5 --caps LocalServices+NetworkServices+ProtServ+ReadUserData+SwEvent+UserEnvironment+WriteUserData+Location+PowerMgmt+ReadDeviceData+SurroundingsDD+TrustedUI+WriteDeviceData --appname=Ped --version=%d.%02d build_3rdEd Ped_%s_3rdEd.sis''' % \
+                           %s py2sis --uid=0xE111C2B6 --drive=C --vendor="Arkadiusz Wahlig"  --icon=ped.svg --appname=Ped --version=%d.%02d --cert=PedCert.cer --privkey=PedKey.key --passphrase=6u3r177a --verbose build_3rdEd Ped_%s_3rdEd.sis''' % \
                            ((ensymble,) + version[:2] + (verstr(),)))),
+                           #--caps=PowerMgmt+ReadDeviceData+WriteDeviceData+TrustedUI+ProtServ+SwEvent+NetworkServices+LocalServices+ReadUserData+WriteUserData+Location+SurroundingsDD+UserEnvironment
     
         'all': (['Ped_%s_1stEd.sis' % verstr(),
             'Ped_%s_2ndEd.sis' % verstr(),

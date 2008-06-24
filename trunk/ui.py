@@ -813,23 +813,32 @@ class FileBrowserWindow(Window):
             self.path = ''
             self.name = ''
         self.gtitle = self.ctitle = self.title
-        icons_file = os.path.join(self.private_path, 'file_browser_icons.mbm')
-        if not os.path.exists(icons_file):
+        mbm_file = os.path.join(self.private_path, 'file_browser_icons.mbm')
+        mif_file = os.path.join(self.private_path, 'file_browser_icons.mif')
+        if not os.path.exists(mbm_file) and not os.path.exists(mif_file):
             raise IOError('Missing file browser icons file')
-        lst = [('wait', 8),
-               ('empty', 6),
-               ('drive', 2),
-               ('dir', 0),
-               ('file', 12),
-               ('.txt', 4),
-               ('.py', 10)]
+        if e32.s60_version_info >= (3, 0):
+            from shutil import copyfile
+            dst = 'd:\\file_browser_icons_%s.mif' % app.uid().encode()
+            copyfile(mif_file, dst)
+            mif_file = dst
+        icons_list = [('loading', 8, 16390),
+                      ('info', 6, 16390),
+                      ('drive', 2, 16384),
+                      ('folder', 0, 16388),
+                      ('empty', 12, 16386),
+                      ('.txt', 4, 16394),
+                      ('.py', 10, 16392)]
         self.icons = {}
-        for name, i in lst:
-            self.icons[name] = Icon(icons_file.decode('utf8'), i, i+1)
+        for name, mbm, mif in icons_list:
+            try:
+                self.icons[name] = Icon(mif_file.decode('utf8'), mif, mif+1)
+            except:
+                self.icons[name] = Icon(mbm_file.decode('utf8'), mbm, mbm+1)
         self.settings = Settings(os.path.join(self.private_path, 'file_browser_settings.bin'))
         self.settings.add_setting('default', 'recents', Setting(_('Recents'), []))
         self.settings.load_if_available()
-        self.body = Listbox([(unicode(_(u'<empty>')), self.icons['empty'])], self.select_click)
+        self.body = Listbox([(unicode(_(u'(empty)')), self.icons['info'])], self.select_click)
         self.body.bind(EKeyStar, self.filter_click)
         self.keys += (EKeyLeftArrow, EKeyRightArrow, EKeyHash, EKeyBackspace)
         self.control_keys += (EKeyUpArrow, EKeyDownArrow)
@@ -873,19 +882,19 @@ class FileBrowserWindow(Window):
         try:
             return self.icons[ext]
         except KeyError:
-            return self.icons['file']
+            return self.icons['empty']
 
     def update(self, mark=''):
-        self.body.set_list([(unicode(_(u'Loading...')), self.icons['wait'])])
+        self.body.set_list([(unicode(_(u'Loading...')), self.icons['loading'])])
         if self.path == '':
             self.ctitle = self.gtitle
             e32.ao_yield()
             self.lstall = [(self.DRIVE, self.icons['drive'], x, x.encode('utf8')) for x in e32.drive_list()]
             def format(link):
-                if os.path.isdir(link[0]):
-                    return (self.DIR, self.icons['dir'], link[1], link[0])
-                else:
+                if os.path.isfile(link[0]):
                     return (self.FILE, self.get_file_icon(link[0]), link[1], link[0])
+                else:
+                    return (self.DIR, self.icons['folder'], link[1], link[0])
             self.lstall += map(format, self.links)
             def format(filename):
                 path, name = os.path.split(filename)
@@ -908,11 +917,17 @@ class FileBrowserWindow(Window):
                 self.ctitle = os.path.split(self.path)[1].decode('utf8')
             e32.ao_yield()
             def format(name):
-                if os.path.isdir(os.path.join(self.path, name)):
-                    return (self.DIR, self.icons['dir'], name.decode('utf8'), name)
-                else:
+                if os.path.isfile(os.path.join(self.path, name)):
                     return (self.FILE, self.get_file_icon(name), name.decode('utf8'), name)
-            self.lstall = map(format, os.listdir(self.path))
+                else:
+                    return (self.DIR, self.icons['folder'], name.decode('utf8'), name)
+            try:
+                ldir = os.listdir(self.path)
+            except OSError:
+                note(unicode(_(u'Cannot list directory')), 'error')
+                self.lstall = []
+            else:
+                self.lstall = map(format, ldir)
         def compare(a, b):
             if a[0] > b[0]:
                 return 0
@@ -927,7 +942,7 @@ class FileBrowserWindow(Window):
             except ValueError:
                 pass
         if not self.lstall:
-            self.lstall.append((self.INFO, self.icons['empty'], _(u'(no files)'), None))
+            self.lstall.append((self.INFO, self.icons['info'], _(u'(no files)'), None))
         self.set_list(active, dofilter=True)
         self.make_menu()
 
@@ -961,7 +976,7 @@ class FileBrowserWindow(Window):
             if self.filterstr:
                 self.lst = [x for x in self.lstall if x[0] == self.INFO or unicode(x[2]).lower().find(self.filterstr) >= 0]
                 if not self.lst:
-                    self.lst.append((self.INFO, self.icons['empty'], _(u'<no match>'), None))
+                    self.lst.append((self.INFO, self.icons['info'], _(u'(no match)'), None))
                 try:
                     active = self.lst.index(self.lstall[active])
                 except ValueError:
