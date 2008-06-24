@@ -57,7 +57,9 @@ def main():
         
         'Ped_%s_3rdEd.sis' % verstr():
             (['default.py', 'ped.pyo', 'ui.pyo', 'ped.svg', 'file_browser_icons.mif', 'LICENSE'],
-            lambda: system('''copy default.py build_3rdEd\\
+            lambda: system('''rmdir /s/q build_3rdEd
+                           mkdir build_3rdEd
+                           copy default.py build_3rdEd\\
                            copy ped.pyo build_3rdEd\\ped.pyc
                            copy ui.pyo build_3rdEd\\ui.pyc
                            copy file_browser_icons.mif build_3rdEd\\
