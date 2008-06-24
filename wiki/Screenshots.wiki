@@ -1,5 +1,5 @@
 #summary Ped target device screenshots.
 #labels ped,screenshots
 
-==2.30 beta on Nokia N73==
+==Ped 2.30 beta on Nokia N73==
 http://ped-s60.googlecode.com/svn/trunk/screenshots/2.30%20beta/N73/Scr000004.jpg http://ped-s60.googlecode.com/svn/trunk/screenshots/2.30%20beta/N73/Scr000005.jpg http://ped-s60.googlecode.com/svn/trunk/screenshots/2.30%20beta/N73/Scr000006.jpg http://ped-s60.googlecode.com/svn/trunk/screenshots/2.30%20beta/N73/Scr000007.jpg http://ped-s60.googlecode.com/svn/trunk/screenshots/2.30%20beta/N73/Scr000008.jpg http://ped-s60.googlecode.com/svn/trunk/screenshots/2.30%20beta/N73/Scr000009.jpg http://ped-s60.googlecode.com/svn/trunk/screenshots/2.30%20beta/N73/Scr000010.jpg http://ped-s60.googlecode.com/svn/trunk/screenshots/2.30%20beta/N73/Scr000012.jpg http://ped-s60.googlecode.com/svn/trunk/screenshots/2.30%20beta/N73/Scr000013.jpg 
