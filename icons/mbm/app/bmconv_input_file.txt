@@ -1,0 +1,5 @@
+ped.mbm
+/c24icons\mbm\app\Bitmap_big.bmp
+/c24icons\mbm\app\Bitmap_big_mask.bmp
+/c24icons\mbm\app\Bitmap_small.bmp
+/c24icons\mbm\app\Bitmap_small_mask.bmp

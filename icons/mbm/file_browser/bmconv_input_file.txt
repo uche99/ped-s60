@@ -1,0 +1,15 @@
+file_browser_icons.mbm
+/c8icons\mbm\file_browser\Bitmap_0001.bmp
+/c8icons\mbm\file_browser\Bitmap_0002.bmp
+/c8icons\mbm\file_browser\Bitmap_0003.bmp
+/c8icons\mbm\file_browser\Bitmap_0004.bmp
+/c8icons\mbm\file_browser\Bitmap_0005.bmp
+/c8icons\mbm\file_browser\Bitmap_0006.bmp
+/c8icons\mbm\file_browser\Bitmap_0013.bmp
+/c8icons\mbm\file_browser\Bitmap_0014.bmp
+/c8icons\mbm\file_browser\Bitmap_0021.bmp
+/c8icons\mbm\file_browser\Bitmap_0022.bmp
+/c8icons\mbm\file_browser\Bitmap_0033.bmp
+/c8icons\mbm\file_browser\Bitmap_0034.bmp
+/c8icons\mbm\file_browser\Bitmap_0039.bmp
+/c8icons\mbm\file_browser\Bitmap_0040.bmp

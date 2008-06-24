@@ -866,6 +866,18 @@ class PythonFileWindow(TextFileWindow, PythonModifier):
             return TextFileWindow.control_key_press(self, key)
         return False
 
+    def move_beg_of_line(self, delta=0):
+        # overridden method to first jump to the beginning of text in a line
+        pos = self.body.get_pos()
+        lnum, offset, ln = self.get_line_from_pos(pos)
+        try:
+            indent = ln.index(ln.lstrip()[0])
+        except:
+            indent = 0
+        if indent == pos - offset:
+            indent = 0
+        self.body.set_pos(offset + indent + delta)
+
     def run_click(self):
         TextFileWindow.store_session()
         try:
@@ -1170,6 +1182,7 @@ class PythonShellWindow(IOWindow, PythonModifier):
             pass
         self.init_console()
         halfbar = '=' * 5
+        self.move_end_of_document()
         self.write(halfbar + ' RESTART ' + halfbar + '\n')
         self.prompt()
 
@@ -1216,7 +1229,7 @@ class PythonShellWindow(IOWindow, PythonModifier):
                 ui.schedule(self.body.set_pos, self.prompt_pos)
         elif key == ui.EKeyLeftArrow:
             ln, pos, line = self.get_line_from_pos()
-            if pos <= self.prompt_pos <= pos+len(line):
+            if pos <= self.prompt_pos <= pos + len(line):
                 pos = self.prompt_pos
             ui.schedule(self.body.set_pos, pos)
             self.reset_control_key()
