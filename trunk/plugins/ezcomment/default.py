@@ -49,19 +49,17 @@ def control_key_press(self, key):
         # let the old method control the key
         return old_control_key_press(self, key)
 
-# new ped.Application.apply_settings method
-def apply_settings(self):
-    # store the current language in oldlang
-    oldlang = self.language
-    # call the old method, it will set the self.language if the user changed it
-    old_apply_settings(self)
-    # if new language was selected, try to load it
-    if self.language != oldlang:
+# new ped.Application.set_language method
+def set_language(self, language):
+    # call the old method and see if it changed the language
+    ret = old_set_language(self, language)
+    if ret:
         try:
-            translator.load(os.path.join(path, 'lang\\%s' % self.language.encode('utf8')))
+            translator.load(os.path.join(path, 'lang\\' + language.encode('utf8')))
         except IOError:
             # fall back to default (english)
             translator.unload()
+    return ret
 
 if __name__ == '__main__':
     # plugin path
@@ -71,7 +69,7 @@ if __name__ == '__main__':
     translator = _ = ui.Translator()
     if ped.app.language != u'English':
         try:
-            translator.load(os.path.join(path, 'lang\\%s' % ped.app.language.encode('utf8')))
+            translator.load(os.path.join(path, 'lang\\' + ped.app.language.encode('utf8')))
         except IOError:
             pass
 
@@ -79,10 +77,10 @@ if __name__ == '__main__':
     old_control_key_press = ped.repattr(ped.PythonFileWindow,
         'control_key_press', control_key_press)
 
-    # patch the ped.Application.apply_settings method
-    old_apply_settings = ped.repattr(ped.Application,
-        'apply_settings', apply_settings)
+    # patch the ped.Application.set_language method
+    old_set_language = ped.repattr(ped.Application,
+        'set_language', set_language)
 
     # add the shortkey configuration to the settings
-    ped.app.settings.add_setting('misc', 'ezcomment_key',
+    ped.app.settings.add_setting('plugins', 'ezcomment_key',
         ui.ShortkeySetting(_('EZ-Comment key'), ui.EKey2))
