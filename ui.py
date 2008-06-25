@@ -52,6 +52,14 @@ except AttributeError:
         reset_inactivity = lambda: None
 
 
+# for 3rd edition, the InfoPopup class isn't in appuifw.__all__
+# so we have to import it separately
+try:
+    from appuifw import InfoPopup
+except ImportError:
+    pass
+    
+
 class Event(object):
     def __init__(self):
         self.lock = e32.Ao_lock()
@@ -173,15 +181,17 @@ class Menu(object):
         if search_field:
             full_screen = True
         if full_screen:
-            rootwintitle = screen.rootwin.title
+            win = screen.focused_window()
+            if win:
+                wintitle = win.title
         menu = self
         try:
             while True:
                 items = [x for x in menu.items if not x.hidden]
                 titles = [unicode(x.title) for x in items]
                 if full_screen:
-                    screen.rootwin.title = menu.title
-                    screen.rootwin.focus = True
+                    if win:
+                        win.title = menu.title
                     i = selection_list(titles, search_field)
                 elif menu:
                     i = popup_menu(titles, unicode(menu.title))
@@ -196,23 +206,23 @@ class Menu(object):
                 except AttributeError:
                     break
         finally:
-            if full_screen:
-                screen.rootwin.focus = False
-                screen.rootwin.title = rootwintitle
+            if full_screen and win:
+                win.title = wintitle
         return item
 
     def multichoice(self, style='checkbox', search_field=False):
         items = [x for x in self.items if not x.hidden]
         titles = [unicode(x.title) for x in items]
-        rootwintitle = screen.rootwin.title
-        screen.rootwin.title = self.title
-        screen.rootwin.focus = True
+        win = screen.focused_window()
+        if win:
+            wintitle = win.title
+            win.title = self.title
         try:
             ret = multi_selection_list(titles, style, search_field)
             return tuple([items[x] for x in ret])
         finally:
-            screen.rootwin.focus = False
-            screen.rootwin.title = rootwintitle
+            if win:
+                win.title = wintitle
 
 
 # size
@@ -839,8 +849,7 @@ class FileBrowserWindow(Window):
         self.settings.add_setting('default', 'recents', Setting(_('Recents'), []))
         self.settings.load_if_available()
         self.body = Listbox([(unicode(_(u'(empty)')), self.icons['info'])], self.select_click)
-        self.body.bind(EKeyStar, self.filter_click)
-        self.keys += (EKeyLeftArrow, EKeyRightArrow, EKeyHash, EKeyBackspace)
+        self.keys += (EKeyLeftArrow, EKeyRightArrow, EKeyStar, EKey0, EKeyHash, EKeyBackspace)
         self.control_keys += (EKeyUpArrow, EKeyDownArrow)
         self.busy = False
         self.DRIVE, self.DIR, self.FILE, self.INFO = range(4)
@@ -1021,6 +1030,10 @@ class FileBrowserWindow(Window):
             self.enter_click()
         elif key == EKeyBackspace:
             self.delete_click()
+        elif key == EKeyStar:
+            self.filter_click()
+        elif key == EKey0:
+            self.info_click()
         elif key == EKeyHash:
             self.drives_click()
         else:
@@ -1157,6 +1170,31 @@ class FileBrowserWindow(Window):
             except OSError:
                 note(unicode(_(u'Cannot create folder')), 'error')
 
+    def info_click(self):
+        item = self.lst[self.body.current()]
+        if item[0] not in [self.FILE, self.DIR]:
+            return
+        import time
+        stat = os.stat(os.path.join(self.path, item[3]))
+        if item[0] == self.FILE:
+            n = stat.st_size
+            text = '%d bytes' % n
+            if n > 1024:
+                n /= 1024.0
+                text = '%.1f KB' % n
+            if n > 1024:
+                n /= 1024.0
+                text = '%.1f MB' % n
+            text += '\n'
+        else:
+            text = ''
+        text += time.strftime('%d.%m.%Y %H:%M:%S', time.localtime(stat.st_mtime))
+        try:
+            self.popup = InfoPopup()
+            self.popup.show(unicode(text))
+        except NameError:
+            note(unicode(text))
+
 
 class Setting(object):
     def __init__(self, title, value):
@@ -1279,12 +1317,18 @@ class ComboSetting(Setting):
     def edit(self):
         lst = map(unicode, self.choices)
         try:
-            i = self.choices.index(self.value)
-            lst[i] = u'* %s' % lst[i]
+            c = self.choices.index(self.value)
+            s = u'* %s' % lst[c]
+            del lst[c]
+            lst.insert(0, s)
         except ValueError:
-            pass
+            c = 0
         i = popup_menu(lst, unicode(self.title))
         if i is not None:
+            if i == 0:
+                i = c
+            elif i <= c:
+                i -= 1
             self.value = self.choices[i]
             return True
         return False
@@ -1344,11 +1388,15 @@ class DateSetting(Setting):
     def edit(self):
         v = query(unicode(self.title), 'date', self.value)
         if v is not None:
-            # for some reason the value returned by date query
-            # is always shifted by timezone (at least on 2.0
-            # platform)
-            # TODO: check other platforms
+            # the value returned by date query seems to always
+            # be shifted by timezone; to complicate things more,
+            # on newer platforms it is shifted by 3600 seconds
+            # more :\
             from time import timezone
+            # NOTE: i'm not sure if the inreased shift started
+            # with version 3.0 !
+            if e32.s60_version_info >= (3, 0):
+                timezone -= 3600
             self.value = v - timezone
             return True
         return False
@@ -1723,7 +1771,8 @@ if e32.s60_version_info < (2, 8):
      EStatusPaneTop) = range(24)
 
     __layout = {
-        EMainPane: ((176, 144), (0, 0)),
+        EApplicationWindow: ((176, 208), (0, 0)),
+        EMainPane: ((176, 144), (0, 44)),
         # TODO: Add other ids
     }
 

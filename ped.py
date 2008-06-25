@@ -93,10 +93,25 @@ class GlobalWindowModifier(object):
 
     def control_key_press(self, key):
         if key == ui.EKeyStar:
-            StdIOWrapper.shell()
+            m = _m = app.settings['scrorientation'].get()
+            if m == ui.oriAutomatic:
+                w, h = ui.layout(ui.EApplicationWindow)[0]
+                if w > h:
+                    m = ui.oriPortrait
+                else:
+                    m = ui.oriLandscape
+            elif m == ui.oriPortrait:
+                m = ui.oriLandscape
+            elif m == ui.oriLandscape:
+                m = ui.oriPortrait
+            if m != _m:
+                app.settings['scrorientation'].set(m)
+                app.settings.save()
+                for win in ui.screen.find_windows():
+                    win.orientation = m
             return True
         elif key == ui.EKey0:
-            app.runscript_click()
+            StdIOWrapper.shell()
             return True
         elif key == ui.EKeyHash:
             app.open_click()
@@ -408,15 +423,29 @@ class TextWindow(Window):
         self.body.set_pos(line[1] + len(line[2]) + delta)
 
     def move_page_up(self, delta=0):
+        sett = 'pagesize'
+        if self.orientation == ui.oriLandscape:
+            sett += 'land'
+        elif self.size == ui.sizLarge:
+            sett += 'full'
+        else:
+            sett += 'norm'
         lines = self.get_lines()
-        i = self.get_line_from_pos(lines=lines)[0] - 1 - app.settings['pagesize'].get() + delta
+        i = self.get_line_from_pos(lines=lines)[0] - 1 - app.settings[sett].get() + delta
         if i < 0:
             i = 0
         self.body.set_pos(lines[i][1])
 
     def move_page_down(self, delta=0):
+        sett = 'pagesize'
+        if self.orientation == ui.oriLandscape:
+            sett += 'land'
+        elif self.size == ui.sizLarge:
+            sett += 'full'
+        else:
+            sett += 'norm'
         lines = self.get_lines()
-        i = self.get_line_from_pos(lines=lines)[0] - 1 + app.settings['pagesize'].get() + delta
+        i = self.get_line_from_pos(lines=lines)[0] - 1 + app.settings[sett].get() + delta
         if i >= len(lines):
             i = -1
         self.body.set_pos(lines[i][1])
@@ -761,10 +790,14 @@ class PythonModifier(object):
             pos -= 1
         name = text[pos+1:i]
         if name:
-            win = ui.screen.create_window(AutocloseTextWindow, title=_('Call Tip'))
-            menu = ui.Menu()
-            menu.append(ui.MenuItem(_('Close'), target=win.close))
-            win.menu = menu
+            if hasattr(ui, 'InfoPopup'):
+                self.py_calltip_popup = ui.InfoPopup()
+                win = None
+            else:
+                win = ui.screen.create_window(AutocloseTextWindow, title=_('Call Tip'))
+                menu = ui.Menu()
+                menu.append(ui.MenuItem(_('Close'), target=win.close))
+                win.menu = menu
             # try to get the object
             obj = self._get_object(name)
             if obj is not None:
@@ -814,13 +847,23 @@ class PythonModifier(object):
                     arg_text += '\n\n' + doc
                 if arg_text:
                     # display the call-tip
-                    win.body.add(unicode(arg_text) + u'\n')
+                    if win:
+                        win.body.add(unicode(arg_text) + u'\n')
+                    else:
+                        self.py_calltip_popup.show(unicode(arg_text), (-1, -1), 10000)
                 else:
-                    win.body.add(u'%s()\n\nNo additional info available.\n' % name)
+                    if win:
+                        win.body.add(u'%s()\n\nNo additional info available.\n' % name)
+                    else:
+                        self.py_calltip_popup.show(u'%s()\n\nNo additional info available.' % name)
             else:
-                win.body.add(u'%s\n\nUnknown object.\n' % name)
-            win.body.set_pos(0)
-            win.focus = True
+                if win:
+                    win.body.add(u'%s\n\nUnknown object.\n' % name)
+                else:
+                    self.py_calltip_popup.show(u'%s\n\nUnknown object.' % name)
+            if win:
+                win.body.set_pos(0)
+                win.focus = True
         else:
             ui.note(unicode(stdhelp))
 
@@ -1688,22 +1731,24 @@ class Application(object):
         if e32.s60_version_info >= (3, 0):
             allorientations += [(_('Portrait'), ui.oriPortrait), (_('Landscape'), ui.oriLandscape)]
         settings = ui.Settings(os.path.join(self.path, 'settings.bin'), title=_('Settings'))
-        settings.add_category('view', ui.Category(_('View')))
-        settings.add_category('text', ui.Category(_('Text')))
-        settings.add_category('file', ui.Category(_('File')))
-        settings.add_category('misc', ui.Category(_('Misc')))
-        settings.add_setting('view', 'language', ui.ComboSetting(_('Language'), u'English', alllanguages))
-        settings.add_setting('view', 'font', ui.ComboSetting(_('Text font'), defaultfont, allfonts))
+        settings.add_category('main', ui.Category(_('Main')))
+        settings.add_category('editor', ui.Category(_('Editor')))
+        settings.add_category('python', ui.Category(_('Python')))
+        settings.add_category('plugins', ui.Category(_('Plugins')))
         # 'color', 'shellcolor', 'orientation' and 'autosave' IDs used old ValueComboSetting class
         # and cannot be used with the new one
-        settings.add_setting('view', 'defcolor', ui.ValueComboSetting(_('Editor color'), 0x000099, allcolors))
-        settings.add_setting('view', 'shcolor', ui.ValueComboSetting(_('Shell color'), 0x008800, allcolors))
-        settings.add_setting('view', 'scrorientation', ui.ValueComboSetting(_('Orientation'), allorientations[0][1], allorientations))
-        settings.add_setting('text', 'pagesize', ui.NumberSetting(_('Page size'), 8, vmin=1, vmax=32))
-        settings.add_setting('text', 'indent', ui.NumberSetting(_('Indentation size'), 4, vmin=1, vmax=8))
-        settings.add_setting('file', 'defenc', ui.ComboSetting(_('Default encoding'), 'utf-8', ('ascii', 'latin-1', 'utf-8', 'utf-16')))
-        settings.add_setting('file', 'autosaveinterval', ui.ValueComboSetting(_('Autosave'), 0, ((_('Off'), 0), (_('%d sec') % 30, 30), (_('%d min') % 1, 60), (_('%d min') % 2, 120), (_('%d min') % 5, 300), (_('%d min') % 10, 600))))
-        settings.add_setting('misc', 'askforargs', ui.BoolSetting(_('Ask for arguments'), False))
+        settings.add_setting('main', 'language', ui.ComboSetting(_('Language'), u'English', alllanguages))
+        settings.add_setting('main', 'scrorientation', ui.ValueComboSetting(_('Screen orientation'), allorientations[0][1], allorientations))
+        settings.add_setting('main', 'defenc', ui.ComboSetting(_('Default encoding'), 'utf-8', ('ascii', 'latin-1', 'utf-8', 'utf-16')))
+        settings.add_setting('main', 'autosaveinterval', ui.ValueComboSetting(_('Autosave'), 0, ((_('Off'), 0), (_('%d sec') % 30, 30), (_('%d min') % 1, 60), (_('%d min') % 2, 120), (_('%d min') % 5, 300), (_('%d min') % 10, 600))))
+        settings.add_setting('editor', 'font', ui.ComboSetting(_('Font'), defaultfont, allfonts))
+        settings.add_setting('editor', 'defcolor', ui.ValueComboSetting(_('Color'), 0x000099, allcolors))
+        settings.add_setting('editor', 'pagesizenorm', ui.NumberSetting(_('Page size, normal'), 8, vmin=1, vmax=64))
+        settings.add_setting('editor', 'pagesizefull', ui.NumberSetting(_('Page size, full screen'), 11, vmin=1, vmax=64))
+        settings.add_setting('editor', 'pagesizeland', ui.NumberSetting(_('Page size, landscape'), 9, vmin=1, vmax=64))
+        settings.add_setting('python', 'askforargs', ui.BoolSetting(_('Ask for arguments'), False))
+        settings.add_setting('python', 'shcolor', ui.ValueComboSetting(_('Shell text color'), 0x008800, allcolors))
+        settings.add_setting('python', 'indent', ui.NumberSetting(_('Indentation size'), 4, vmin=1, vmax=8))
         self.settings = settings
 
         # setup file browser
@@ -1845,17 +1890,22 @@ class Application(object):
         if self.settings.edit():
             self.apply_settings()
 
+    def set_language(self, language):
+        if language == self.language:
+            return False
+        self.language = language
+        if self.language == u'English':
+            translator.unload()
+        else:
+            translator.load(os.path.join(self.path, 
+                'lang\\ped\\%s' % self.language.encode('utf8')))
+        return True
+
     def apply_settings(self):
         TextWindow.update_settings()
-        for win in ui.screen.find_windows(Window):
+        for win in ui.screen.find_windows():
             win.orientation = self.settings['scrorientation'].get()
-        if self.settings['language'].get() != self.language:
-            self.language = self.settings['language'].get()
-            if self.language == u'English':
-                translator.unload()
-            else:
-                translator.load(os.path.join(self.path, 
-                    'lang\\ped\\%s' % self.language.encode('utf8')))
+        if self.set_language(self.settings['language'].get()):
             ui.screen.redraw()
 
     def plugins_click(self):
