@@ -131,6 +131,21 @@ class RootWindow(ui.RootWindow, GlobalWindowModifier):
         self.old_stdio = sys.stdin, sys.stdout, sys.stderr
         sys.stdin = sys.stdout = sys.stderr = StdIOWrapper()
 
+        # stop Python from self closing to prevent data loss if for example
+        # the RED key is pressed
+        if e32.s60_version_info >= (3.0):
+            from atexit import register
+            self.exitlock = lock = e32.Ao_lock()
+            def exithandler():
+                # redraw screen, fix for disappearing top pane
+                from appuifw import app
+                size = app.screen
+                app.screen = 'full'
+                app.screen = size
+                # wait forever
+                lock.wait()
+            register(exithandler)
+
     def redraw_callback(self, rect):
         ui.RootWindow.redraw_callback(self, rect)
         if len(ui.screen.windows) == 1: # if the root window is the only one
@@ -153,6 +168,9 @@ class RootWindow(ui.RootWindow, GlobalWindowModifier):
         if r:
             # restore stdio redirection
             sys.stdin, sys.stdout, sys.stderr = self.old_stdio
+            # disable red-key-close preventer (see __init__)
+            if hasattr(self, 'exitlock'):
+                self.exitlock.signal()
             # exit application
             ui.app.set_exit()
 
@@ -1741,7 +1759,6 @@ class Application(object):
         settings.add_setting('main', 'scrorientation', ui.ValueComboSetting(_('Screen orientation'), allorientations[0][1], allorientations))
         settings.add_setting('main', 'defenc', ui.ComboSetting(_('Default encoding'), 'utf-8', ('ascii', 'latin-1', 'utf-8', 'utf-16')))
         settings.add_setting('main', 'autosaveinterval', ui.ValueComboSetting(_('Autosave'), 0, ((_('Off'), 0), (_('%d sec') % 30, 30), (_('%d min') % 1, 60), (_('%d min') % 2, 120), (_('%d min') % 5, 300), (_('%d min') % 10, 600))))
-        settings.add_setting('main', 'systemapp', ui.BoolSetting(_('System application'), False))
         settings.add_setting('editor', 'font', ui.ComboSetting(_('Font'), defaultfont, allfonts))
         settings.add_setting('editor', 'defcolor', ui.ValueComboSetting(_('Color'), 0x000099, allcolors))
         settings.add_setting('editor', 'pagesizenorm', ui.NumberSetting(_('Page size, normal'), 8, vmin=1, vmax=64))
@@ -1878,7 +1895,7 @@ class Application(object):
                 self.settings.load_if_available()
                 self.apply_settings()
             ui.screen.redraw()
-
+            
     def new_file(self, klass):
         title = 'Unnamed%d%s' % (self.unnamed_count, klass.type_ext)
         self.unnamed_count += 1
@@ -1908,22 +1925,6 @@ class Application(object):
             win.orientation = self.settings['scrorientation'].get()
         if self.set_language(self.settings['language'].get()):
             ui.screen.redraw()
-        if self.settings['systemapp'].get():
-            try:
-                import envy
-            except ImportError:
-                ui.note(unicode(_('Requires \'envy\' module to become system application!')), 'error')
-                self.settings['systemapp'].set(False)
-                self.settings.save()
-            else:
-                envy.set_app_system(1)
-        else:
-            try:
-                import envy
-            except ImportError:
-                pass
-            else:
-                envy.set_app_system(0)
 
     def plugins_click(self):
         if self.plugins_win and self.plugins_win.is_alive():
