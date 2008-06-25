@@ -35,7 +35,8 @@ def main():
             lambda: system('''mifconv file_browser_icons.mif /Ficons\\mif\\file_browser\\mifconv_input_file.txt''')),
         
         'ped.aif': (['ped.rss', 'ped.mbm'],
-            lambda: system('aiftool ped ped.mbm')),
+            lambda: system('''set EPOCROOT=c:\\symbian\\7.0s\\Series60_v20_CW
+                           aiftool ped ped.mbm''')),
         
         'ped.pyo': (['ped.py'],
             lambda: system('''%s -O compile.py ped.py

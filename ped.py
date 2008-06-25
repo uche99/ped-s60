@@ -1741,6 +1741,7 @@ class Application(object):
         settings.add_setting('main', 'scrorientation', ui.ValueComboSetting(_('Screen orientation'), allorientations[0][1], allorientations))
         settings.add_setting('main', 'defenc', ui.ComboSetting(_('Default encoding'), 'utf-8', ('ascii', 'latin-1', 'utf-8', 'utf-16')))
         settings.add_setting('main', 'autosaveinterval', ui.ValueComboSetting(_('Autosave'), 0, ((_('Off'), 0), (_('%d sec') % 30, 30), (_('%d min') % 1, 60), (_('%d min') % 2, 120), (_('%d min') % 5, 300), (_('%d min') % 10, 600))))
+        settings.add_setting('main', 'systemapp', ui.BoolSetting(_('System application'), False))
         settings.add_setting('editor', 'font', ui.ComboSetting(_('Font'), defaultfont, allfonts))
         settings.add_setting('editor', 'defcolor', ui.ValueComboSetting(_('Color'), 0x000099, allcolors))
         settings.add_setting('editor', 'pagesizenorm', ui.NumberSetting(_('Page size, normal'), 8, vmin=1, vmax=64))
@@ -1907,6 +1908,22 @@ class Application(object):
             win.orientation = self.settings['scrorientation'].get()
         if self.set_language(self.settings['language'].get()):
             ui.screen.redraw()
+        if self.settings['systemapp'].get():
+            try:
+                import envy
+            except ImportError:
+                ui.note(unicode(_('Requires \'envy\' module to become system application!')), 'error')
+                self.settings['systemapp'].set(False)
+                self.settings.save()
+            else:
+                envy.set_app_system(1)
+        else:
+            try:
+                import envy
+            except ImportError:
+                pass
+            else:
+                envy.set_app_system(0)
 
     def plugins_click(self):
         if self.plugins_win and self.plugins_win.is_alive():
