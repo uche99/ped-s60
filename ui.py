@@ -934,7 +934,8 @@ class FileBrowserWindow(Window):
                 ldir = os.listdir(self.path)
             except OSError:
                 note(unicode(_(u'Cannot list directory')), 'error')
-                self.lstall = []
+                self.parent_click()
+                return
             else:
                 self.lstall = map(format, ldir)
         def compare(a, b):
@@ -1791,3 +1792,9 @@ screen = Screen()
 
 # i18n object
 translator = _ = Translator()
+
+# global InfoPopup
+try:
+    infopopup = InfoPopup()
+except NameError:
+    pass
