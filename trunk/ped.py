@@ -93,22 +93,7 @@ class GlobalWindowModifier(object):
 
     def control_key_press(self, key):
         if key == ui.EKeyStar:
-            m = _m = app.settings['scrorientation'].get()
-            if m == ui.oriAutomatic:
-                w, h = ui.layout(ui.EApplicationWindow)[0]
-                if w > h:
-                    m = ui.oriPortrait
-                else:
-                    m = ui.oriLandscape
-            elif m == ui.oriPortrait:
-                m = ui.oriLandscape
-            elif m == ui.oriLandscape:
-                m = ui.oriPortrait
-            if m != _m:
-                app.settings['scrorientation'].set(m)
-                app.settings.save()
-                for win in ui.screen.find_windows():
-                    win.orientation = m
+            app.orientation_click()
             return True
         elif key == ui.EKey0:
             StdIOWrapper.shell()
@@ -137,6 +122,9 @@ class RootWindow(ui.RootWindow, GlobalWindowModifier):
             from atexit import register
             self.exitlock = lock = e32.Ao_lock()
             def exithandler():
+                if ui.screen.focused_window() == self:
+                    # no windows opened, let it quit
+                    return
                 # redraw screen, fix for disappearing top pane
                 from appuifw import app
                 size = app.screen
@@ -249,10 +237,6 @@ class TextWindow(Window):
         self.apply_settings()
 
     def init_menu(self, menu):
-        try:
-            file_item = menu.find(title=_('File'))[0]
-        except IndexError:
-            return
         edit_menu = ui.Menu()
         edit_menu.append(ui.MenuItem(_('Find...'), target=self.find_click))
         edit_menu.append(ui.MenuItem(_('Find Next'), target=self.findnext_click))
@@ -260,9 +244,21 @@ class TextWindow(Window):
         edit_menu.append(ui.MenuItem(_('Go to Line...'), target=self.gotoline_click))
         edit_menu.append(ui.MenuItem(_('Top'), target=self.move_beg_of_document))
         edit_menu.append(ui.MenuItem(_('Bottom'), target=self.move_end_of_document))
-        edit_menu.append(ui.MenuItem(_('Full Screen'), target=self.fullscreen_click))
-        i = menu.index(file_item)
-        menu.insert(i+1, ui.MenuItem(_('Edit'), submenu=edit_menu))
+        edit_item = ui.MenuItem(_('Edit'), submenu=edit_menu)
+        try:
+            file_item = menu.find(title=_('File'))[0]
+        except IndexError:
+            menu.insert(0, edit_item)
+        else:
+            menu.insert(menu.index(file_item)+1, edit_item)
+        fullscreen_item = ui.MenuItem(_('Full Screen'), target=self.fullscreen_click)
+        try:
+            view_menu = menu.find(title=_('View'))[0].submenu
+        except IndexError:
+            # shouldn't happen but what the heck :)
+            edit_menu.append(fullscreen_item)
+        else:
+            view_menu.append(fullscreen_item)
 
     def enter_key_press(self):
         pass
@@ -533,7 +529,7 @@ class TextFileWindow(TextWindow):
             autosave = app.settings[autosave].get()
             self.autosave_timer.cancel()
             if autosave and self.path is not None:
-                self.autosave_timer.after(autosave, self.save)
+                self.autosave_timer.after(autosave, self.autosave)
         except AttributeError:
             pass
 
@@ -579,7 +575,10 @@ class TextFileWindow(TextWindow):
     def control_key_press(self, key):
         if key == ui.EKey9:
             if self.save():
-                ui.note(unicode(_('File saved')))
+                if hasattr(ui, 'infopopup'):
+                    ui.infopopup.show(unicode(_('File saved')))
+                else:
+                    ui.note(unicode(_('File saved')))
             return True
         return TextWindow.control_key_press(self, key)
 
@@ -609,7 +608,7 @@ class TextFileWindow(TextWindow):
         autosave = app.settings['autosaveinterval'].get()
         self.autosave_timer.cancel()
         if autosave:
-            self.autosave_timer.after(autosave, self.save)
+            self.autosave_timer.after(autosave, self.autosave)
         try:
             f = file(self.path, 'w')
             f.write(self.body.get().replace(u'\u2029', u'\r\n').encode(self.encoding))
@@ -618,6 +617,11 @@ class TextFileWindow(TextWindow):
         except IOError:
             ui.note(unicode(_('Cannot save file!')), 'error')
             return False
+
+    def autosave(self):
+        if self.save():
+            if hasattr(ui, 'infopopup'):
+                ui.infopopup.show(unicode(_('File saved')))
 
     def save_as(self):
         path = self.path
@@ -808,8 +812,7 @@ class PythonModifier(object):
             pos -= 1
         name = text[pos+1:i]
         if name:
-            if hasattr(ui, 'InfoPopup'):
-                self.py_calltip_popup = ui.InfoPopup()
+            if hasattr(ui, 'infopopup'):
                 win = None
             else:
                 win = ui.screen.create_window(AutocloseTextWindow, title=_('Call Tip'))
@@ -868,17 +871,17 @@ class PythonModifier(object):
                     if win:
                         win.body.add(unicode(arg_text) + u'\n')
                     else:
-                        self.py_calltip_popup.show(unicode(arg_text), (-1, -1), 10000)
+                        ui.infopopup.show(unicode(arg_text), (-1, -1), 10000)
                 else:
                     if win:
                         win.body.add(u'%s()\n\nNo additional info available.\n' % name)
                     else:
-                        self.py_calltip_popup.show(u'%s()\n\nNo additional info available.' % name)
+                        ui.infopopup.show(u'%s()\n\nNo additional info available.' % name)
             else:
                 if win:
                     win.body.add(u'%s\n\nUnknown object.\n' % name)
                 else:
-                    self.py_calltip_popup.show(u'%s\n\nUnknown object.' % name)
+                    ui.infopopup.show(u'%s\n\nUnknown object.' % name)
             if win:
                 win.body.set_pos(0)
                 win.focus = True
@@ -1110,9 +1113,9 @@ class IOWindow(TextWindow):
                 # insert the strings in place
                 body.add(u''.join(buf))
                 del buf[:]
-                ln = body.len()
-                if ln > 3000:
-                    body.delete(0, ln - 250)
+                # while the len exceeds 3000 chars, we remove first 250
+                while body.len() > 3000:
+                    body.delete(0, 250)
             return doflush
         self.do_flush = make_flusher(self.body, self.write_buf)
         self.flush_gate = e32.ao_callgate(self.do_flush)
@@ -1807,9 +1810,12 @@ class Application(object):
         main_menu.append(ui.MenuItem(_('Windows'), submenu=ui.Menu(), hidden=True))
         main_menu.append(ui.MenuItem(_('Python Shell'), target=StdIOWrapper.shell))
         main_menu.append(ui.MenuItem(_('Run Script...'), target=self.runscript_click))
-        main_menu.append(ui.MenuItem(_('Settings'), target=self.settings_click))
-        main_menu.append(ui.MenuItem(_('Plugins'), target=self.plugins_click))
-        main_menu.append(ui.MenuItem(_('Help'), target=self.help_click))
+        view_menu = ui.Menu()
+        view_menu.append(ui.MenuItem(_('Settings'), target=self.settings_click))
+        view_menu.append(ui.MenuItem(_('Plugins'), target=self.plugins_click))
+        view_menu.append(ui.MenuItem(_('Help'), target=self.help_click))
+        view_menu.append(ui.MenuItem(_('Orientation'), target=self.orientation_click))
+        main_menu.append(ui.MenuItem(_('View'), submenu=view_menu))
         # BEG: temporary
         m = ui.Menu()
         m.append(ui.MenuItem('ui', target=lambda: ui.translator.save('e:\\lang-ui')))
@@ -2052,6 +2058,24 @@ class Application(object):
             shell.lock(False)
             ui.screen.redraw()
             shell.enable_prompt(True)
+
+    def orientation_click(self):
+        m = _m = self.settings['scrorientation'].get()
+        if m == ui.oriAutomatic:
+            w, h = ui.layout(ui.EApplicationWindow)[0]
+            if w > h:
+                m = ui.oriPortrait
+            else:
+                m = ui.oriLandscape
+        elif m == ui.oriPortrait:
+            m = ui.oriLandscape
+        elif m == ui.oriLandscape:
+            m = ui.oriPortrait
+        if m != _m:
+            self.settings['scrorientation'].set(m)
+            self.settings.save()
+            for win in ui.screen.find_windows():
+                win.orientation = m
 
 
 def quote_split(s):
