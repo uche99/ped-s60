@@ -110,7 +110,7 @@ class RootWindow(ui.RootWindow, GlobalWindowModifier):
         GlobalWindowModifier.__init__(self)
         self.no_popup_menu = False
         self.keys += (ui.EKeySelect,)
-        self.text = _(u'Version: %s\nPython for S60: %s\n') % (__version__, e32.pys60_version)
+        self.text = _('Version: %s\nPython for S60: %s\n') % (__version__, e32.pys60_version)
         
         # setup stdio redirection
         self.old_stdio = sys.stdin, sys.stdout, sys.stderr
@@ -363,7 +363,7 @@ class TextWindow(Window):
         return (ln, lpos, line)
 
     def find_click(self):
-        find_text = ui.query(unicode(_('Find:')), 'text', self.find_text)
+        find_text = ui.query(_('Find:'), 'text', self.find_text)
         if find_text:
             self.find_text = find_text
             self.findnext_click(False)
@@ -384,16 +384,16 @@ class TextWindow(Window):
                 self.body.set_pos(i)
             else:
                 if pos != 0:
-                    if ui.query(unicode(_('Not found, start from beginning?')), 'query'):
+                    if ui.query(_('Not found, start from beginning?'), 'query'):
                         i = 0
                         skip = False
                         continue
                 else:
-                    ui.note(unicode(_('Not found')))
+                    ui.note(_('Not found'))
             break
 
     def findall_click(self):
-        find_text = ui.query(unicode(_('Find All:')), 'text', self.find_text)
+        find_text = ui.query(_('Find All:'), 'text', self.find_text)
         if find_text:
             self.find_text = find_text
             find_text = find_text.lower()
@@ -414,12 +414,12 @@ class TextWindow(Window):
                 if line:
                     self.body.set_pos(line[1] + line[3])
             else:
-                ui.note(unicode(_('Not found')))
+                ui.note(_('Not found'))
 
     def gotoline_click(self):
         lines = self.get_lines()
         ln = self.get_line_from_pos(lines=lines)[0]
-        ln = ui.query(unicode(_('Line (1-%d):') % len(lines)), 'number', ln)
+        ln = ui.query(_('Line (1-%d):') % len(lines), 'number', ln)
         if ln is not None:
             if ln < 1:
                 ln = 1
@@ -483,7 +483,7 @@ class FindResultsWindow(Window):
             kwargs['title'] = _('Find All')
         Window.__init__(self, *args, **kwargs)
         self.results = kwargs['results']
-        self.body = ui.Listbox([(unicode(_(u'Line %d, Column %d') % (x[0], x[3])), x[2]) for x in self.results], self.select_click)
+        self.body = ui.Listbox([(_('Line %d, Column %d') % (x[0], x[3]), x[2]) for x in self.results], self.select_click)
         self.menu = ui.Menu()
         self.menu.append(ui.MenuItem(_('Select'), target=self.select_click))
         self.menu.append(ui.MenuItem(_('Exit'), target=self.close))
@@ -576,9 +576,9 @@ class TextFileWindow(TextWindow):
         if key == ui.EKey9:
             if self.save():
                 if hasattr(ui, 'infopopup'):
-                    ui.infopopup.show(unicode(_('File saved')))
+                    ui.infopopup.show(_('File saved'))
                 else:
-                    ui.note(unicode(_('File saved')))
+                    ui.note(_('File saved'))
             return True
         return TextWindow.control_key_press(self, key)
 
@@ -615,13 +615,13 @@ class TextFileWindow(TextWindow):
             f.close()
             return True
         except IOError:
-            ui.note(unicode(_('Cannot save file!')), 'error')
+            ui.note(_('Cannot save file!'), 'error')
             return False
 
     def autosave(self):
         if self.save():
             if hasattr(ui, 'infopopup'):
-                ui.infopopup.show(unicode(_('File saved')))
+                ui.infopopup.show(_('File saved'))
 
     def save_as(self):
         path = self.path
@@ -975,7 +975,7 @@ class PythonFileWindow(TextFileWindow, PythonModifier):
             if not item:
                 return
             if getattr(item, 'edit', False):
-                args = ui.query(unicode(_('Arguments:')), 'text', item.args)
+                args = ui.query(_('Arguments:'), 'text', item.args)
                 if not args:
                     # cancel
                     return
@@ -987,7 +987,7 @@ class PythonFileWindow(TextFileWindow, PythonModifier):
             args = []
         shell = StdIOWrapper.shell()
         if shell.is_locked():
-            ui.note(unicode(_('Shell is busy!')), 'error')
+            ui.note(_('Shell is busy!'), 'error')
             return
         shell.restart()
         shell.enable_prompt(False)
@@ -1424,10 +1424,10 @@ class PythonShellWindow(IOWindow, PythonModifier):
             f.write(self.body.get().replace(u'\u2029', u'\r\n').encode(app.settings['defenc'].get()))
             f.close()
         except IOError:
-            ui.note(unicode(_('Cannot export the output!')), 'error')
+            ui.note(_('Cannot export the output!'), 'error')
 
     def clear_click(self):
-        if ui.query(unicode(_('Clear the buffer?')), 'query'):
+        if ui.query(_('Clear the buffer?'), 'query'):
             self.body.clear()
             self.prompt()
 
@@ -1582,7 +1582,7 @@ class PluginsWindow(Window):
                 descr = _('Installed. Restart Ped to run.')
             lst.append((u'%s %s' % (manifest['name'], manifest['version']), unicode(descr)))
         for name in started:
-            lst.append((unicode(name), unicode(_('Uninstalled. Restart to stop.'))))
+            lst.append((unicode(name), _('Uninstalled. Restart to stop.')))
         if plugins:
             self.menu = self.menu_plugins
             self.popup_menu = self.popup_menu_plugins
@@ -1590,7 +1590,7 @@ class PluginsWindow(Window):
             self.menu = self.menu_empty
             self.popup_menu = self.popup_menu_empty
         if not lst:
-            lst.append((unicode(_('(no plugins)')), u''))
+            lst.append((_('(no plugins)'), u''))
         self.body.set_list(lst, 0)
         self.plugins = plugins
 
@@ -1603,7 +1603,7 @@ class PluginsWindow(Window):
         try:
             path, name, manifest = self.plugins[self.body.current()]
         except IndexError:
-            ui.note(unicode(_('Not available!')), 'error')
+            ui.note(_('Not available!'), 'error')
             return
         bwin = ui.screen.create_blank_window(_('Please wait...'))
         path = os.path.join(path, 'help')
@@ -1614,11 +1614,11 @@ class PluginsWindow(Window):
             win = ui.screen.create_window(HelpWindow,
                     path=helpfile,
                     title=_('Help for %s') % manifest['name'])
-            win.body.add((u'%s\n' + unicode(_('Version: %s')) + u'\n\n') % (manifest['name'], manifest['version']))
+            win.body.add((u'%s\n' + _('Version: %s') + u'\n\n') % (manifest['name'], manifest['version']))
             win.body.set_pos(0)
             win.focus = True
         except IOError:
-            ui.note(unicode(_('Cannot load help file!')), 'error')
+            ui.note(_('Cannot load help file!'), 'error')
             bwin.close()
 
     def install_click(self):
@@ -1631,35 +1631,35 @@ class PluginsWindow(Window):
         try:
             self.uninstall(self.plugins[self.body.current()][0])
         except IndexError:
-            ui.note(unicode(_('Not available!')), 'error')
+            ui.note(_('Not available!'), 'error')
             return
 
     def install(self, filename):
         import zipfile
         # plugin must be a zip file
         if not zipfile.is_zipfile(filename):
-            ui.note(unicode(_('Not a plugin file!')), 'error')
+            ui.note(_('Not a plugin file!'), 'error')
             return
         z = zipfile.ZipFile(filename)
         lst = [x.lower() for x in z.namelist()]
         # plugin must contain the manifest and default python files
         if 'manifest.txt' not in lst or ('default.py' not in lst and 'default.pyc' not in lst):
-            ui.note(unicode(_('Not a plugin file!')), 'error')
+            ui.note(_('Not a plugin file!'), 'error')
             return
         # parse manifest and check mandatory fields
         dct = dict([(x.lower(), x) for x in z.namelist()])
         manifest = parse_manifest(z.read(dct['manifest.txt']).decode('utf8'))
         for field in ('folder', 'name', 'version', 'ped-version-min', 'ped-version-max'):
             if field not in manifest:
-                ui.note(unicode(_('%s field missing from manifest!') % field.capitalize()))
+                ui.note(_('%s field missing from manifest!') % field.capitalize())
                 return
-        if not ui.query(unicode(_('Install\n%s %s?') % (manifest['name'], manifest['version'])), 'query'):
+        if not ui.query(_('Install\n%s %s?') % (manifest['name'], manifest['version']), 'query'):
             return
         if __version__ < manifest['ped-version-min']:
-            ui.note(unicode(_('Requires Ped in at least version %s! Your is %s.') % (manifest['ped-version-min'], __version__)), 'error')
+            ui.note(_('Requires Ped in at least version %s! Your is %s.') % (manifest['ped-version-min'], __version__), 'error')
             return
         if __version__ > manifest['ped-version-max']:
-            if not ui.query(unicode(_('Supports Ped up to version %s. Your is %s. Continue?') % (manifest['ped-version-max'], __version__)), 'query'):
+            if not ui.query(_('Supports Ped up to version %s. Your is %s. Continue?') % (manifest['ped-version-max'], __version__), 'query'):
                 return
         # create plugins directory if needed
         if not os.path.exists(self.plugins_path):
@@ -1669,7 +1669,7 @@ class PluginsWindow(Window):
             fh = file(os.path.join(path, 'manifest.txt'))
             old_manifest = parse_manifest(fh.read())
             fh.close()
-            if not ui.query(unicode(_('Replace version %s with %s?') % (old_manifest['version'], manifest['version'])), 'query'):
+            if not ui.query(_('Replace version %s with %s?') % (old_manifest['version'], manifest['version']), 'query'):
                 return
             self.uninstall(path, quiet=True)
         # create plugin directory
@@ -1684,15 +1684,15 @@ class PluginsWindow(Window):
                 fh.write(z.read(f.filename))
                 fh.close()
         z.close()
-        ui.note(unicode(_('%s %s installed.') % (manifest['name'], manifest['version'])), 'conf')
-        ui.note(unicode(_('Restart Ped for the changes to take effect.')))
+        ui.note(_('%s %s installed.') % (manifest['name'], manifest['version']), 'conf')
+        ui.note(_('Restart Ped for the changes to take effect.'))
         self.update()
 
     def uninstall(self, path, quiet=False):
         fh = file(os.path.join(path, 'manifest.txt'))
         manifest = parse_manifest(fh.read())
         fh.close()
-        if not quiet and not ui.query(unicode(_('Uninstall\n%s %s?') % (manifest['name'], manifest['version'])), 'query'):
+        if not quiet and not ui.query(_('Uninstall\n%s %s?') % (manifest['name'], manifest['version']), 'query'):
             return
         def deldir(path):
             for name in os.listdir(path):
@@ -1704,8 +1704,8 @@ class PluginsWindow(Window):
             os.rmdir(path)
         deldir(path)
         if not quiet:
-            ui.note(unicode(_('%s %s uninstalled.') % (manifest['name'], manifest['version'])), 'conf')
-            ui.note(unicode(_('Restart Ped for the changes to take effect.')))
+            ui.note(_('%s %s uninstalled.') % (manifest['name'], manifest['version']), 'conf')
+            ui.note(_('Restart Ped for the changes to take effect.'))
         self.update()
 
 
@@ -1727,17 +1727,17 @@ class Application(object):
         settings = ui.Settings(os.path.join(self.path, 'settings.bin'))
         settings.add_setting('default', 'language', ui.ComboSetting('Language', u'English', alllanguages))
         settings.load_if_available()
-        self.language = settings['language'].get()
-        if self.language != u'English':
+        self.language = settings['language'].get().encode('utf8')
+        if self.language != 'English':
             try:
                 # load the ped language file
-                translator.load(os.path.join(path, self.language.encode('utf8')))
+                translator.load(os.path.join(path, self.language))
             except IOError:
                 pass
             try:
                 # load the ui language file
                 path = os.path.join(self.path, 'lang\\ui')
-                ui.translator.load(os.path.join(path, self.language.encode('utf8')))
+                ui.translator.load(os.path.join(path, self.language))
             except IOError:
                 pass
 
@@ -1816,12 +1816,6 @@ class Application(object):
         view_menu.append(ui.MenuItem(_('Help'), target=self.help_click))
         view_menu.append(ui.MenuItem(_('Orientation'), target=self.orientation_click))
         main_menu.append(ui.MenuItem(_('View'), submenu=view_menu))
-        # BEG: temporary
-        m = ui.Menu()
-        m.append(ui.MenuItem('ui', target=lambda: ui.translator.save('e:\\lang-ui')))
-        m.append(ui.MenuItem('ped', target=lambda: translator.save('e:\\lang-ped')))
-        main_menu.append(ui.MenuItem(_('Dump lang'), submenu=m))
-        # END: temporary
         main_menu.append(ui.MenuItem(_('Exit'), target=ui.screen.rootwin.close))
         ui.screen.rootwin.menu = main_menu
 
@@ -1835,7 +1829,7 @@ class Application(object):
         # restore session
         TextFileWindow.session.load_if_available()
         state = TextFileWindow.session['state'].get()
-        if state and ui.query(unicode(_('Last Ped session crashed. Reload its last state?')), 'query'):
+        if state and ui.query(_('Last Ped session crashed. Reload its last state?'), 'query'):
             for path, (text, encoding) in state.items():
                 if text is None:
                     self.load_file(path)
@@ -1862,7 +1856,7 @@ class Application(object):
         try:
             TextFileWindow.session.save()
         except IOError:
-            ui.note(unicode(_('Cannot update session file!')), 'error')
+            ui.note(_('Cannot update session file!'), 'error')
 
         # the ui is set up now so we can simply leave and the launchpad will keep us
         # running until appuifw.app.set_exit() is called (see: RootWindow.close)
@@ -1914,23 +1908,12 @@ class Application(object):
         if self.settings.edit():
             self.apply_settings()
 
-    def set_language(self, language):
-        if language == self.language:
-            return False
-        self.language = language
-        if self.language == u'English':
-            translator.unload()
-        else:
-            translator.load(os.path.join(self.path, 
-                'lang\\ped\\%s' % self.language.encode('utf8')))
-        return True
-
     def apply_settings(self):
         TextWindow.update_settings()
         for win in ui.screen.find_windows():
             win.orientation = self.settings['scrorientation'].get()
-        if self.set_language(self.settings['language'].get()):
-            ui.screen.redraw()
+        if self.language != self.settings['language'].get().encode('utf8'):
+            ui.note(_('Restart Ped for the changes to take effect.'))
 
     def plugins_click(self):
         if self.plugins_win and self.plugins_win.is_alive():
@@ -1945,7 +1928,7 @@ class Application(object):
             return
         bwin = ui.screen.create_blank_window(_('Please wait...'))
         path = os.path.join(self.path, 'lang\\help')
-        helpfile = os.path.join(path, self.language.encode('utf8'))
+        helpfile = os.path.join(path, self.language)
         if not os.path.exists(helpfile):
             helpfile = os.path.join(path, 'English')
         try:
@@ -1960,7 +1943,7 @@ class Application(object):
             self.help_win.body.set_pos(0)
             self.help_win.focus = True
         except IOError:
-            ui.note(unicode(_('Cannot load help file!')), 'error')
+            ui.note(_('Cannot load help file!'), 'error')
             bwin.close()
 
     def new_click(self):
@@ -1973,7 +1956,7 @@ class Application(object):
 
     def open_click(self):
         if self.browser_win:
-            ui.note(unicode(_('File browser already in use!')), 'error')
+            ui.note(_('File browser already in use!'), 'error')
             return
         self.browser_win = ui.screen.create_window(ui.FileBrowserWindow,
                 title=_('Open file'))
@@ -2001,13 +1984,13 @@ class Application(object):
             win.focus = True
         except IOError:
             win = None
-            ui.note(unicode(_('Cannot load %s file!') % os.path.split(path)[1]), 'error')
+            ui.note(_('Cannot load %s file!') % os.path.split(path)[1], 'error')
             wwin.close()
         return win
 
     def runscript_click(self):
         if self.browser_win:
-            ui.note(unicode(_('File browser already in use!')), 'error')
+            ui.note(_('File browser already in use!'), 'error')
             return
         self.browser_win = ui.screen.create_window(ui.FileBrowserWindow,
                 title=_('Run script'))
@@ -2023,7 +2006,7 @@ class Application(object):
             if not item:
                 return
             if item.name == 'edit':
-                args = ui.query(unicode(_('Arguments:')), 'text')
+                args = ui.query(_('Arguments:'), 'text')
                 if not args:
                     return
             else:
@@ -2033,7 +2016,7 @@ class Application(object):
             args = []
         shell = StdIOWrapper.shell()
         if shell.is_locked():
-            ui.note(unicode(_('Shell is busy!')), 'error')
+            ui.note(_('Shell is busy!'), 'error')
             return
         shell.restart()
         shell.enable_prompt(False)

@@ -49,37 +49,21 @@ def control_key_press(self, key):
         # let the old method control the key
         return old_control_key_press(self, key)
 
-# new ped.Application.set_language method
-def set_language(self, language):
-    # call the old method and see if it changed the language
-    ret = old_set_language(self, language)
-    if ret:
-        try:
-            translator.load(os.path.join(path, 'lang\\' + language.encode('utf8')))
-        except IOError:
-            # fall back to default (english)
-            translator.unload()
-    return ret
-
 if __name__ == '__main__':
     # plugin path
     path = os.path.split(sys.argv[0])[0]
 
     # i18n object
     translator = _ = ui.Translator()
-    if ped.app.language != u'English':
+    if ped.app.language != 'English':
         try:
-            translator.load(os.path.join(path, 'lang\\' + ped.app.language.encode('utf8')))
+            translator.load(os.path.join(path, 'lang\\' + ped.app.language))
         except IOError:
             pass
 
     # patch the ped.PythonFileWindow.control_key_press method
     old_control_key_press = ped.repattr(ped.PythonFileWindow,
         'control_key_press', control_key_press)
-
-    # patch the ped.Application.set_language method
-    old_set_language = ped.repattr(ped.Application,
-        'set_language', set_language)
 
     # add the shortkey configuration to the settings
     ped.app.settings.add_setting('plugins', 'ezcomment_key',
