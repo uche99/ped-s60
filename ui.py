@@ -848,7 +848,7 @@ class FileBrowserWindow(Window):
         self.settings = Settings(os.path.join(self.private_path, 'file_browser_settings.bin'))
         self.settings.add_setting('default', 'recents', Setting(_('Recents'), []))
         self.settings.load_if_available()
-        self.body = Listbox([(unicode(_(u'(empty)')), self.icons['info'])], self.select_click)
+        self.body = Listbox([(_('(empty)'), self.icons['info'])], self.select_click)
         self.keys += (EKeyLeftArrow, EKeyRightArrow, EKeyStar, EKey0, EKeyHash, EKeyBackspace)
         self.control_keys += (EKeyUpArrow, EKeyDownArrow)
         self.busy = False
@@ -868,7 +868,7 @@ class FileBrowserWindow(Window):
                 return False
             if title is None:
                 path, name = os.path.split(link)
-                title = _(u'%s in %s') % (name.decode('utf8'), path.decode('utf8'))
+                title = _('%s in %s') % (name.decode('utf8'), path.decode('utf8'))
             cls.links.append((link, title))
             return True
         return False
@@ -894,7 +894,7 @@ class FileBrowserWindow(Window):
             return self.icons['empty']
 
     def update(self, mark=''):
-        self.body.set_list([(unicode(_(u'Loading...')), self.icons['loading'])])
+        self.body.set_list([(_('Loading...'), self.icons['loading'])])
         if self.path == '':
             self.ctitle = self.gtitle
             e32.ao_yield()
@@ -907,7 +907,7 @@ class FileBrowserWindow(Window):
             self.lstall += map(format, self.links)
             def format(filename):
                 path, name = os.path.split(filename)
-                title = _(u'%s in %s') % (name.decode('utf8'), path.decode('utf8'))
+                title = _('%s in %s') % (name.decode('utf8'), path.decode('utf8'))
                 return (self.FILE, self.get_file_icon(filename), title, filename)
             recents = self.settings['recents'].get()
             recentslen = len(recents)
@@ -933,7 +933,7 @@ class FileBrowserWindow(Window):
             try:
                 ldir = os.listdir(self.path)
             except OSError:
-                note(unicode(_(u'Cannot list directory')), 'error')
+                note(_('Cannot list directory'), 'error')
                 self.parent_click()
                 return
             else:
@@ -952,7 +952,7 @@ class FileBrowserWindow(Window):
             except ValueError:
                 pass
         if not self.lstall:
-            self.lstall.append((self.INFO, self.icons['info'], _(u'(no files)'), None))
+            self.lstall.append((self.INFO, self.icons['info'], _('(no files)'), None))
         self.set_list(active, dofilter=True)
         self.make_menu()
 
@@ -986,7 +986,7 @@ class FileBrowserWindow(Window):
             if self.filterstr:
                 self.lst = [x for x in self.lstall if x[0] == self.INFO or unicode(x[2]).lower().find(self.filterstr) >= 0]
                 if not self.lst:
-                    self.lst.append((self.INFO, self.icons['info'], _(u'(no match)'), None))
+                    self.lst.append((self.INFO, self.icons['info'], _('(no match)'), None))
                 try:
                     active = self.lst.index(self.lstall[active])
                 except ValueError:
@@ -1064,7 +1064,7 @@ class FileBrowserWindow(Window):
         self.make_menu()
 
     def editfilter_click(self):
-        f = query(unicode(_(u'Filter:')), 'text', self.filterstr)
+        f = query(_('Filter:'), 'text', self.filterstr)
         if f:
             self.filterstr = f.lower()
             self.set_list(dofilter=True)
@@ -1103,16 +1103,16 @@ class FileBrowserWindow(Window):
         name, ext = os.path.splitext(name)
         path = None
         while True:
-            name = query(unicode(_(u'Name:')), 'text', name.decode('utf8'))
+            name = query(_('Name:'), 'text', name.decode('utf8'))
             if name is None:
                 return
             name = name.encode('utf8')
             path = os.path.join(self.path, name + ext)
             if os.path.exists(path):
                 if os.path.isdir(path):
-                    note(unicode(_(u'Invalid name')), 'error')
+                    note(_('Invalid name'), 'error')
                     continue
-                elif not query(unicode(_(u'Already exists!\nOverwrite?')), 'query'):
+                elif not query(_('Already exists!\nOverwrite?'), 'query'):
                     continue
             break
         self.add_recent(path)
@@ -1124,7 +1124,7 @@ class FileBrowserWindow(Window):
         item = self.lst[self.body.current()]
         if item[0] not in [self.FILE, self.DIR]:
             return
-        if query(unicode(_(u'Delete %s?') % item[2]), 'query'):
+        if query(_('Delete %s?') % item[2], 'query'):
             try:
                 path = os.path.join(self.path, item[3])
                 if os.path.isfile(path):
@@ -1133,7 +1133,7 @@ class FileBrowserWindow(Window):
                     os.rmdir(path)
                 self.update()
             except OSError:
-                note(unicode(_(u'Cannot delete')), 'error')
+                note(_('Cannot delete'), 'error')
 
     def rename_click(self):
         item = self.lst[self.body.current()]
@@ -1141,7 +1141,7 @@ class FileBrowserWindow(Window):
             return
         name, ext = os.path.splitext(item[3])
         while True:
-            name = query(unicode(_(u'Name:')), 'text', name.decode('utf8'))
+            name = query(_('Name:'), 'text', name.decode('utf8'))
             if name is None:
                 break
             name = name.encode('utf8')
@@ -1150,26 +1150,26 @@ class FileBrowserWindow(Window):
             try:
                 if os.path.exists(dst) and src.lower() != dst.lower():
                     if os.path.isdir(dst):
-                        note(unicode(_(u'Already exists as a directory!')), 'error')
+                        note(_('Already exists as a directory!'), 'error')
                         continue
-                    if not query(unicode(_(u'Already exists!\nOverwrite?')), 'query'):
+                    if not query(_('Already exists!\nOverwrite?'), 'query'):
                         continue
                     os.remove(dst)
                 os.rename(src, dst)
                 self.update(name + ext)
                 break
             except OSError:
-                note(unicode(_(u'Cannot rename')), 'error')
+                note(_('Cannot rename'), 'error')
                 break
 
     def mkdir_click(self):
-        name = query(unicode(_(u'Name:')), 'text')
+        name = query(_('Name:'), 'text')
         if name is not None:
             try:
                 os.mkdir(os.path.join(self.path, name.encode('utf8')))
                 self.update(name.encode('utf8'))
             except OSError:
-                note(unicode(_(u'Cannot create folder')), 'error')
+                note(_('Cannot create folder'), 'error')
 
     def info_click(self):
         item = self.lst[self.body.current()]
@@ -1259,10 +1259,10 @@ class NumberSetting(Setting):
             if v is None:
                 return False
             if self.vmin is not None and v < self.vmin:
-                note(unicode(_(u'Minimal value is %s') % self.vmin))
+                note(_('Minimal value is %s') % self.vmin)
                 continue
             if self.vmax is not None and v > self.vmax:
-                note(unicode(_(u'Maximal value is %s') % self.vmax))
+                note(_('Maximal value is %s') % self.vmax)
                 continue
             self.value = v
             break
@@ -1280,10 +1280,10 @@ class FloatSetting(NumberSetting):
             if v is None:
                 return False
             if self.vmin is not None and v < self.vmin:
-                note(unicode(_(u'Minimal value is %.2f') % self.vmin))
+                note(_('Minimal value is %.2f') % self.vmin)
                 continue
             if self.vmax is not None and v > self.vmax:
-                note(unicode(_(u'Maximal value is %.2f') % self.vmax))
+                note(_('Maximal value is %.2f') % self.vmax)
                 continue
             self.value = v
             break
@@ -1293,9 +1293,9 @@ class FloatSetting(NumberSetting):
 class BoolSetting(Setting):
     def __init__(self, title, value=False, true=None, false=None):
         if true is None:
-            true = _(u'On')
+            true = _('On')
         if false is None:
-            false = _(u'Off')
+            false = _('Off')
         Setting.__init__(self, title, value)
         self.true = true
         self.false = false
@@ -1416,7 +1416,7 @@ class ShortkeySettingWindow(Window):
         Window.__init__(self, *args, **kwargs)
         self.body = Text()
         if 'text' not in kwargs:
-            kwargs['text'] = u'%s\n' % _(u'Press a new shortkey or select Exit to cancel this dialog.')
+            kwargs['text'] = u'%s\n' % _('Press a new shortkey or select Exit to cancel this dialog.')
         self.body.add(unicode(kwargs['text']))
         self.menu.append(MenuItem(_('Exit'), target=self.close))
         self.control_keys = (EKey0, EKey1, EKey2, EKey3, EKey4, EKey5, EKey6, EKey7, EKey8,
@@ -1439,10 +1439,10 @@ class ShortkeySetting(Setting):
         return False
 
     def __str__(self):
-        return str(_(u'Green + %s') % unichr(self.value))
+        return str(self.__unicode__())
 
     def __unicode__(self):
-        return unicode(_(u'Green + %s') % unichr(self.value))
+        return _('Green + %s') % unichr(self.value)
 
 
 class CustomSetting(Setting):
@@ -1460,7 +1460,7 @@ class CustomSetting(Setting):
 class Settings(object):
     def __init__(self, filename, title=None):
         if title is None:
-            title = _(u'Settings')
+            title = _('Settings')
         self.filename = filename
         self.title = title
         self.settings = {}
@@ -1581,7 +1581,7 @@ class SettingsWindow(TabbedWindow):
             return False
         items = [x for x in self.settings.settings.values() if x.changed()]
         if items:
-            if query(unicode(_(u'Save changes?')), 'query'):
+            if query(_('Save changes?'), 'query'):
                 for x in items:
                     x.store()
                 self.settings.save()
@@ -1609,52 +1609,7 @@ class SettingsWindow(TabbedWindow):
                 x.store()
         self.settings.save()
         self.modal_result = True
-        note(unicode(_(u'Changes saved')))
-
-
-class String(object):
-    def __init__(self, translator, *strings, **options):
-        if not strings:
-            raise TypeError('expected at least one string')
-        newstrings = []
-        for s in strings:
-            if isinstance(s, str):
-                s = s.decode('latin1')
-            elif not isinstance(s, unicode):
-                raise TypeError('expected string(s), got %s' % type(s).__name__)
-            newstrings.append(s)
-        self.translator = translator
-        self.strings = tuple(newstrings)
-        self.options = options
-        
-    def __str__(self):
-        return self.__unicode__().encode('latin1')
-        
-    def __unicode__(self):
-        for s in self.strings:
-            try:
-                s = self.translator[s]
-                break
-            except KeyError:
-                self.translator[s] = s
-        else:
-            s = self.strings[-1]
-        if 'format_args' in self.options:
-            return s % self.options['format_args']
-        return s
-        
-    def __repr__(self):
-        return '<%s; %s>' % \
-            (object.__repr__(self)[1:-1], repr(self.__unicode__()))
-
-    def __mod__(self, format_args):
-        unicode(self) % format_args
-        return String(self.translator, format_args=format_args, *self.strings)
-        
-    def __cmp__(self, string):
-        if isinstance(string, String) and self.strings == string.strings:
-            return 0
-        return -1
+        note(_('Changes saved'))
 
 
 class Translator(object):
@@ -1667,50 +1622,36 @@ class Translator(object):
         f = open(filename)
         self.translations = {}
         for ln in f.readlines():
+            ln = ln.strip()
+            if not ln or ln.startswith('#'):
+                continue
             try:
                 x = eval('{\n%s\n}' % ln)
             except:
                 raise ValueError('%s: syntax error' % repr(ln))
             if x:
-                frm = x.keys()[0]
-                self.__setitem__(frm, x[frm])
+                dst = x.values()[0]
+                if dst:
+                    if isinstance(dst, str):
+                        dst = dst.decode('latin1')
+                    elif not isinstance(dst, unicode):
+                        raise TypeError('translation file must contain strings only')
+                    self.translations[x.keys()[0]] = dst
         f.close()
 
     def unload(self):
         self.translations = {}
 
-    def save(self, filename):
-        f = open(filename, 'w')
-        etrans = {}
-        for frm, to in self.translations.items():
-            try:
-                frm = frm.encode('latin1')
-            except:
-                pass
-            try:
-                to = to.encode('latin1')
-            except:
-                pass
-            etrans[frm] = to
-        x = 0
-        for s in etrans.keys():
-            x = max(x, len(repr(s)))
-        for frm, to in etrans.items():
-            f.write('%s%s %s\r\n' % (repr(frm), ' '*(x-len(repr(frm))), repr(to)))
-        f.close()
-
     def __getitem__(self, name):
         return self.translations[name]
         
-    def __setitem__(self, name, value):
-        if isinstance(value, str):
-            value = value.decode('latin1')
-        elif not isinstance(value, unicode):
-            raise TypeError('translation file must contain strings only')
-        self.translations[name] = value
-
     def __call__(self, *strings):
-        return String(self, *strings)
+        for s in strings:
+            try:
+                return self.translations[s]
+            except KeyError:
+                pass
+        return unicode(strings[-1])
 
 
 def available_text_fonts():

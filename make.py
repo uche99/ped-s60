@@ -60,11 +60,13 @@ def main():
             (['default.py', 'ped.pyo', 'ui.pyo', 'ped.svg', 'file_browser_icons.mif', 'LICENSE'],
             lambda: system('''rmdir /s/q build_3rdEd
                            mkdir build_3rdEd
-                           copy default.py build_3rdEd\\
+                           copy default.py build_3rdEd
                            copy ped.pyo build_3rdEd\\ped.pyc
                            copy ui.pyo build_3rdEd\\ui.pyc
-                           copy file_browser_icons.mif build_3rdEd\\
-                           copy LICENSE build_3rdEd\\
+                           copy file_browser_icons.mif build_3rdEd
+                           copy LICENSE build_3rdEd
+                           mkdir build_3rdEd\\lang
+                           xcopy lang build_3rdEd\\lang /s
                            %s py2sis --uid=0xE111C2B6 --drive=C --vendor="Arkadiusz Wahlig"  --icon=ped.svg --appname=Ped --version=%d.%02d --cert=PedCert.cer --privkey=PedKey.key --passphrase=6u3r177a --verbose build_3rdEd Ped_%s_3rdEd.sis''' % \
                            ((ensymble,) + version[:2] + (verstr(),)))),
                            #--caps=PowerMgmt+ReadDeviceData+WriteDeviceData+TrustedUI+ProtServ+SwEvent+NetworkServices+LocalServices+ReadUserData+WriteUserData+Location+SurroundingsDD+UserEnvironment
