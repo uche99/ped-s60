@@ -1,8 +1,18 @@
 #
 # create_lang_from_py.py
 #
-# This script parses a *.py file (give it as argument) and prints out all
-# _(...) calls in the form ready to be used as a translation file.
+# This script parses a *.py file and looks for all
+# _(...)
+# calls. It creates a language file from them and
+# dumps it to stdout.
+#
+# Usage:
+#   create_lang_from_py.py <py_file> [lang_file]
+#
+# py_file - *.py file to parse
+# lang_file - if specified, will be used to provide
+#   translations for the created language file;
+#   useful to add missing strings to a language file
 #
 
 import sys, os
