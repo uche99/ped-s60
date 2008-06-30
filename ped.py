@@ -661,7 +661,15 @@ class TextFileWindow(TextWindow):
             return False
         self.path = path
         self.title = os.path.split(path)[1].decode('utf8')
-        return self.save()
+        ret = self.save()
+        if ret and os.path.splitext(path)[-1].lower() != self.type_ext.lower():
+            # extension changed, reload file to create appropriate window object
+            pos = self.body.get_pos()
+            self.close()
+            win = app.load_file(path)
+            if win:
+                win.body.set_pos(pos)
+        return ret
 
     def close_all(self):
         ui.screen.close_windows(TextFileWindow)
