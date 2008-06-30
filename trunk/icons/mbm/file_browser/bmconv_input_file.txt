@@ -1,4 +1,4 @@
-file_browser_icons.mbm
+ped_file_browser_icons.mbm
 /c8icons\mbm\file_browser\Bitmap_0001.bmp
 /c8icons\mbm\file_browser\Bitmap_0002.bmp
 /c8icons\mbm\file_browser\Bitmap_0003.bmp

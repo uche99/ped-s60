@@ -1,4 +1,4 @@
-/Hfile_browser_icons.mbg
+/Hped_file_browser_icons.mbg
 icons\mif\file_browser\drive.svg
 icons\mif\file_browser\empty.svg
 icons\mif\file_browser\folder.svg

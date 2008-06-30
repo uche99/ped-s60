@@ -807,7 +807,8 @@ fbmSave = range(2)
 
 class FileBrowserWindow(Window):
     links = []
-    private_path = ''
+    icons_path = ''
+    settings_path = ''
 
     def __init__(self, *args, **kwargs):
         if 'title' not in kwargs:
@@ -816,15 +817,9 @@ class FileBrowserWindow(Window):
         self.mode = kwargs.get('mode', fbmOpen)
         self.path, self.name = os.path.split(kwargs.get('path', ''))
         self.gtitle = self.ctitle = self.title
-        mbm_file = os.path.join(self.private_path, 'file_browser_icons.mbm')
-        mif_file = os.path.join(self.private_path, 'file_browser_icons.mif')
-        if not os.path.exists(mbm_file) and not os.path.exists(mif_file):
+        if not os.path.exists(self.icons_path):
             raise IOError('Missing file browser icons file')
-        if e32.s60_version_info >= (3, 0):
-            from shutil import copyfile
-            dst = 'd:\\file_browser_icons_%s.mif' % app.uid().encode()
-            copyfile(mif_file, dst)
-            mif_file = dst
+        icons_type = os.path.splitext(self.icons_path)[-1].lower()
         icons_list = [('loading', 8, 16390),
                       ('info', 6, 16390),
                       ('drive', 2, 16384),
@@ -833,12 +828,13 @@ class FileBrowserWindow(Window):
                       ('.txt', 4, 16394),
                       ('.py', 10, 16392)]
         self.icons = {}
+        path = self.icons_path.decode('utf8')
         for name, mbm, mif in icons_list:
-            try:
-                self.icons[name] = Icon(mif_file.decode('utf8'), mif, mif+1)
-            except:
-                self.icons[name] = Icon(mbm_file.decode('utf8'), mbm, mbm+1)
-        self.settings = Settings(os.path.join(self.private_path, 'file_browser_settings.bin'))
+            if icons_type == '.mif':
+                self.icons[name] = Icon(path, mif, mif+1)
+            else:
+                self.icons[name] = Icon(path, mbm, mbm+1)
+        self.settings = Settings(self.settings_path)
         self.settings.add_setting('default', 'recents', Setting('Recents', []))
         self.settings.load_if_available()
         self.body = Listbox([(_('(empty)'), self.icons['info'])], self.select_click)
