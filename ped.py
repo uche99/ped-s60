@@ -139,18 +139,21 @@ class RootWindow(ui.RootWindow, GlobalWindowModifier):
         ui.RootWindow.redraw_callback(self, rect)
         if len(ui.screen.windows) == 1: # if the root window is the only one
             white = 0xffffff
-            f = 'dense'
+            if e32.pys60_version_info[:3] >= (1, 3, 22):
+                font = ('dense', 12)
+            else:
+                font = 'dense'
             space = 8
-            m = self.body.measure_text(u'A', font=f)[0]
+            m = self.body.measure_text(u'A', font=font)[0]
             h = m[3]-m[1]
             x, y = 10, 10+h
-            self.body.text((x, y), u'Ped - Python IDE', fill=white, font=f)
+            self.body.text((x, y), u'Ped - Python IDE', fill=white, font=font)
             y += space
             self.body.line((x, y, ui.layout(ui.EMainPane)[0][0]-x, y), outline=white)
             for ln in unicode(self.text).split(u'\n'):
                 ln = ln.strip()
                 y += space+h
-                self.body.text((x, y), ln, fill=white, font=f)
+                self.body.text((x, y), ln, fill=white, font=font)
 
     def close(self):
         r = ui.RootWindow.close(self)
@@ -254,12 +257,12 @@ class TextWindow(Window):
             menu.insert(menu.index(file_item)+1, edit_item)
         fullscreen_item = ui.MenuItem(_('Full Screen'), target=self.fullscreen_click)
         try:
-            view_menu = menu.find(title=_('View'))[0].submenu
+            tools_menu = menu.find(title=_('Tools'))[0].submenu
         except IndexError:
             # shouldn't happen but what the heck :)
             edit_menu.append(fullscreen_item)
         else:
-            view_menu.append(fullscreen_item)
+            tools_menu.append(fullscreen_item)
 
     def enter_key_press(self):
         pass
@@ -308,26 +311,44 @@ class TextWindow(Window):
             return Window.control_key_press(self, key)
         return False
 
-    def apply_settings(self, font='font', color='defcolor'):
+    def set_style(self, **kwargs):
+        ofont = self.body.font
+        try:
+            ofont, osize, oflags = ofont
+            extended = True
+        except:
+            osize, oflags = 0, 0
+            extended = False
         do = False
-        try:
-            value = app.settings[font].get()
-            if self.body.font != value:
-                self.body.font = value
-                do = True
-        except KeyError:
-            pass
-        try:
-            value = app.settings[color].get()
-            if self.body.color != value:
-                self.body.color = value
-                do = True
-        except KeyError:
-            pass
-        if do:
-            pos = self.body.get_pos()
-            self.body.set(self.body.get())
-            self.body.set_pos(pos)
+        font = kwargs.get('font', ofont)
+        size = kwargs.get('size', osize)
+        if kwargs.get('antialias', oflags & 16):
+            flags = 16 # graphics.FONT_ANTIALIAS
+        else:
+            flags = 32 # graphics.FONT_NO_ANTIALIAS
+        if kwargs.get('bold', self.body.style & ui.STYLE_BOLD):
+            style = ui.STYLE_BOLD
+        else:
+            style = 0
+        color = kwargs.get('color', self.body.color)
+        # set new values
+        if extended:
+            self.body.font = (font, size, flags)
+        else:
+            self.body.font = font
+        self.body.style = style
+        self.body.color = color
+        # refresh control
+        pos = self.body.get_pos()
+        self.body.set(self.body.get())
+        self.body.set_pos(pos)
+
+    def apply_settings(self):
+        self.set_style(font=app.settings['font'].get(),
+            size=app.settings['fontsize'].get(),
+            antialias=app.settings['fontantialias'].get(),
+            bold=app.settings['fontbold'].get(),
+            color=app.settings['defcolor'].get())
 
     def update_settings(cls):
         ui.screen.rootwin.focus = True
@@ -471,6 +492,9 @@ class TextWindow(Window):
     def move_end_of_document(self):
         self.body.set_pos(self.body.len())
 
+    def reset_caret(self):
+        self.body.set_pos(self.body.get_pos())
+
     def fullscreen_click(self):
         if self.size == ui.sizNormal:
             self.size = ui.sizLarge
@@ -522,12 +546,12 @@ class TextFileWindow(TextWindow):
         self.autosave_timer = e32.Ao_timer()
         self.apply_settings()
 
-    def apply_settings(self, font='font', color='defcolor', defenc='defenc', autosave='autosaveinterval'):
-        TextWindow.apply_settings(self, font, color)
+    def apply_settings(self):
+        TextWindow.apply_settings(self)
         try:
             if not self.fixed_encoding:
-                self.encoding = app.settings[defenc].get()
-            autosave = app.settings[autosave].get()
+                self.encoding = app.settings['defenc'].get()
+            autosave = app.settings['autosaveinterval'].get()
             self.autosave_timer.cancel()
             if autosave and self.path is not None:
                 self.autosave_timer.after(autosave, self.autosave)
@@ -794,7 +818,7 @@ class PythonModifier(object):
                 lev += 1
             pos -= 1
         else:
-            ui.note(unicode(stdhelp))
+            ui.note(stdhelp)
             return
         # search back to non-space chars
         while pos >= 0:
@@ -802,7 +826,7 @@ class PythonModifier(object):
                 break
             pos -= 1
         else:
-            ui.note(unicode(stdhelp))
+            ui.note(stdhelp)
             return
         # extract the name
         i = pos
@@ -813,9 +837,10 @@ class PythonModifier(object):
             pos -= 1
         name = text[pos+1:i]
         if name:
-            if hasattr(ui, 'infopopup'):
+            try:
+                from globalui import global_msg_query
                 win = None
-            else:
+            except ImportError:
                 win = ui.screen.create_window(AutocloseTextWindow, title=_('Call Tip'))
                 menu = ui.Menu()
                 menu.append(ui.MenuItem(_('Close'), target=win.close))
@@ -868,26 +893,31 @@ class PythonModifier(object):
                         arg_text = name
                     arg_text += '\n\n' + doc
                 if arg_text:
+                    text = unicode(arg_text)
                     # display the call-tip
                     if win:
-                        win.body.add(unicode(arg_text) + u'\n')
+                        win.body.add(text + u'\n')
                     else:
-                        ui.infopopup.show(unicode(arg_text), (-1, -1), 10000)
+                        # we use a timer to let the screen refresh if we were called
+                        # from a shortkey; if we won't do it, the Text control text
+                        # will not be visible
+                        timer = e32.Ao_timer()
+                        def timerhandler(timer):
+                            global_msg_query(text, _('Call Tip') + u' - ' + name)
+                        timer.after(0.0, lambda: timerhandler(timer))
                 else:
                     if win:
-                        win.body.add(u'%s()\n\nNo additional info available.\n' % name)
-                    else:
-                        ui.infopopup.show(u'%s()\n\nNo additional info available.' % name)
+                        win.close()
+                    ui.note(_('No additional info for "%s"') % name)
             else:
                 if win:
-                    win.body.add(u'%s\n\nUnknown object.\n' % name)
-                else:
-                    ui.infopopup.show(u'%s\n\nUnknown object.' % name)
-            if win:
+                    win.close()
+                ui.note(_('Unknown callable "%s"') % name)
+            if win and win.is_alive():
                 win.body.set_pos(0)
                 win.focus = True
         else:
-            ui.note(unicode(stdhelp))
+            ui.note(stdhelp)
 
 
 PythonModifier.py_reset_namespace()
@@ -1397,8 +1427,12 @@ class PythonShellWindow(IOWindow, PythonModifier):
         finally:
             self.lock(False)
 
-    def apply_settings(self, font='font', color='shcolor'):
-        IOWindow.apply_settings(self, font, color)
+    def apply_settings(self):
+        self.set_style(font=app.settings['font'].get(),
+            size=app.settings['fontsize'].get(),
+            antialias=app.settings['fontantialias'].get(),
+            bold=app.settings['fontbold'].get(),
+            color=app.settings['shcolor'].get())
 
     def history_click(self):
         win = ui.screen.create_window(HistoryWindow,
@@ -1764,6 +1798,9 @@ class Application(object):
         settings.add_setting('main', 'defenc', ui.ComboSetting(_('Default encoding'), 'utf-8', ('ascii', 'latin-1', 'utf-8', 'utf-16')))
         settings.add_setting('main', 'autosaveinterval', ui.ValueComboSetting(_('Autosave'), 0, ((_('Off'), 0), (_('%d sec') % 30, 30), (_('%d min') % 1, 60), (_('%d min') % 2, 120), (_('%d min') % 5, 300), (_('%d min') % 10, 600))))
         settings.add_setting('editor', 'font', ui.ComboSetting(_('Font'), defaultfont, allfonts))
+        settings.add_setting('editor', 'fontsize', ui.NumberSetting(_('Font size'), 12))
+        settings.add_setting('editor', 'fontantialias', ui.BoolSetting(_('Font anti-aliasing'), True))
+        settings.add_setting('editor', 'fontbold', ui.BoolSetting(_('Bold font'), False))
         settings.add_setting('editor', 'defcolor', ui.ValueComboSetting(_('Color'), 0x000099, allcolors))
         settings.add_setting('editor', 'pagesizenorm', ui.NumberSetting(_('Page size, normal'), 8, vmin=1, vmax=64))
         settings.add_setting('editor', 'pagesizefull', ui.NumberSetting(_('Page size, full screen'), 11, vmin=1, vmax=64))
@@ -1811,12 +1848,12 @@ class Application(object):
         main_menu.append(ui.MenuItem(_('Windows'), submenu=ui.Menu(), hidden=True))
         main_menu.append(ui.MenuItem(_('Python Shell'), target=StdIOWrapper.shell))
         main_menu.append(ui.MenuItem(_('Run Script...'), target=self.runscript_click))
-        view_menu = ui.Menu()
-        view_menu.append(ui.MenuItem(_('Settings'), target=self.settings_click))
-        view_menu.append(ui.MenuItem(_('Plugins'), target=self.plugins_click))
-        view_menu.append(ui.MenuItem(_('Help'), target=self.help_click))
-        view_menu.append(ui.MenuItem(_('Orientation'), target=self.orientation_click))
-        main_menu.append(ui.MenuItem(_('View'), submenu=view_menu))
+        tools_menu = ui.Menu()
+        tools_menu.append(ui.MenuItem(_('Settings'), target=self.settings_click))
+        tools_menu.append(ui.MenuItem(_('Plugins'), target=self.plugins_click))
+        tools_menu.append(ui.MenuItem(_('Help'), target=self.help_click))
+        tools_menu.append(ui.MenuItem(_('Orientation'), target=self.orientation_click))
+        main_menu.append(ui.MenuItem(_('Tools'), submenu=tools_menu))
         main_menu.append(ui.MenuItem(_('Exit'), target=ui.screen.rootwin.close))
         ui.screen.rootwin.menu = main_menu
 
@@ -2060,6 +2097,8 @@ class Application(object):
             self.settings.save()
             for win in ui.screen.find_windows():
                 win.orientation = m
+                if isinstance(win, TextWindow):
+                    win.reset_caret()
 
 
 def quote_split(s):
