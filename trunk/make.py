@@ -15,10 +15,26 @@ version_tail = 'beta'
 # python 2.2 binary path
 python22 = 'c:\\python22\\python.exe'
 
+# 2nd edition EPOCROOT
+epocroot2 = 'c:\\symbian\\7.0s\\Series60_v20_CW'
+
 # ensymble path
 ensymble = 'ensymble.py'
 
 def main():
+
+    # commands used in 3rd edition build, used twice later
+    ped_3rded_system = '''rmdir /s/q build_3rdEd
+                       mkdir build_3rdEd
+                       copy default.py build_3rdEd
+                       copy ped.pyo build_3rdEd\\ped.pyc
+                       copy ui.pyo build_3rdEd\\ui.pyc
+                       copy file_browser_icons.mif build_3rdEd
+                       copy LICENSE build_3rdEd
+                       mkdir build_3rdEd\\lang
+                       xcopy lang build_3rdEd\\lang /s
+                       %s py2sis --vendor="Arkadiusz Wahlig" --icon=ped.svg --appname=Ped --version=%d.%02d --verbose %%s build_3rdEd %%s''' % \
+                       ((ensymble,) + version[:2])
 
     # Rules
     rules = {
@@ -35,8 +51,8 @@ def main():
             lambda: system('''mifconv file_browser_icons.mif /Ficons\\mif\\file_browser\\mifconv_input_file.txt''')),
         
         'ped.aif': (['ped.rss', 'ped.mbm'],
-            lambda: system('''set EPOCROOT=c:\\symbian\\7.0s\\Series60_v20_CW
-                           aiftool ped ped.mbm''')),
+            lambda: system('''set EPOCROOT=%s
+                           aiftool ped ped.mbm''' % epocroot2)),
         
         'ped.pyo': (['ped.py'],
             lambda: system('''%s -O compile.py ped.py
@@ -46,33 +62,24 @@ def main():
             lambda: system('''%s -O compile.py ui.py
                            copy ui.pyo system\\apps\\ped\\ui.pyc''' % python22)),
         
-        'Ped_%s_1stEd.sis' % verstr():
-            (['ped_1stEd.pkg', 'default.py', 'ped.pyo', 'ui.pyo', 'ped.aif',
-              'ped_1stEd.app', 'ped.rsc', 'file_browser_icons.mbm', 'LICENSE'],
-            lambda: build_sis_pre3('1stEd')),
-        
         'Ped_%s_2ndEd.sis' % verstr():
             (['ped_2ndEd.pkg', 'default.py', 'ped.pyo', 'ui.pyo', 'ped.aif', 'ped_2ndEd.app',
               'ped.rsc', 'file_browser_icons.mbm', 'LICENSE'],
             lambda: build_sis_pre3('2ndEd')),
         
-        'Ped_%s_3rdEd.sis' % verstr():
+        'Ped_%s_3rdEd_unsigned_testrange.sis' % verstr():
             (['default.py', 'ped.pyo', 'ui.pyo', 'ped.svg', 'file_browser_icons.mif', 'LICENSE'],
-            lambda: system('''rmdir /s/q build_3rdEd
-                           mkdir build_3rdEd
-                           copy default.py build_3rdEd
-                           copy ped.pyo build_3rdEd\\ped.pyc
-                           copy ui.pyo build_3rdEd\\ui.pyc
-                           copy file_browser_icons.mif build_3rdEd
-                           copy LICENSE build_3rdEd
-                           mkdir build_3rdEd\\lang
-                           xcopy lang build_3rdEd\\lang /s
-                           %s py2sis --uid=0xE111C2B6 --drive=C --vendor="Arkadiusz Wahlig"  --icon=ped.svg --appname=Ped --version=%d.%02d --cert=PedCert.cer --privkey=PedKey.key --passphrase=6u3r177a --verbose build_3rdEd Ped_%s_3rdEd.sis''' % \
-                           ((ensymble,) + version[:2] + (verstr(),)))),
-                           #--caps=PowerMgmt+ReadDeviceData+WriteDeviceData+TrustedUI+ProtServ+SwEvent+NetworkServices+LocalServices+ReadUserData+WriteUserData+Location+SurroundingsDD+UserEnvironment
+            lambda: system(ped_3rded_system % \
+                           ('--uid=0xE111C2B6 --caps=PowerMgmt+ReadDeviceData+WriteDeviceData+TrustedUI+ProtServ+SwEvent+NetworkServices+LocalServices+ReadUserData+WriteUserData+Location+SurroundingsDD+UserEnvironment',
+                           'Ped_%s_3rdEd_unsigned_testrange.sis' % verstr()))),
     
-        'all': (['Ped_%s_1stEd.sis' % verstr(),
-            'Ped_%s_2ndEd.sis' % verstr(),
+        'Ped_%s_3rdEd_no_caps.sis' % verstr():
+            (['default.py', 'ped.pyo', 'ui.pyo', 'ped.svg', 'file_browser_icons.mif', 'LICENSE'],
+            lambda: system(ped_3rded_system % \
+                           ('--uid=0xA00042B5',
+                           'Ped_%s_3rdEd_no_caps.sis' % verstr()))),
+
+        'all': (['Ped_%s_2ndEd.sis' % verstr(),
             'Ped_%s_3rdEd.sis' % verstr()],
             lambda: None),
     

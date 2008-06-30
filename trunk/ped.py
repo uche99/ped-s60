@@ -1823,8 +1823,9 @@ class Application(object):
         ui.FileBrowserWindow.private_path = self.path
         ui.FileBrowserWindow.add_link('C:\\Python')
         ui.FileBrowserWindow.add_link('E:\\Python')
-        if not ui.FileBrowserWindow.add_link('E:\\System\\Apps\\Python', _('Python Shell')):
-            ui.FileBrowserWindow.add_link('C:\\System\\Apps\\Python', _('Python Shell'))
+        if e32.s60_version_info < (3, 0):
+            if not ui.FileBrowserWindow.add_link('E:\\System\\Apps\\Python', _('Python Shell')):
+                ui.FileBrowserWindow.add_link('C:\\System\\Apps\\Python', _('Python Shell'))
 
         # setup session
         session = ui.Settings(os.path.join(self.path, 'session.bin'))
