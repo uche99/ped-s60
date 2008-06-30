@@ -813,15 +813,8 @@ class FileBrowserWindow(Window):
         if 'title' not in kwargs:
             kwargs['title'] = _('File browser')
         Window.__init__(self, *args, **kwargs)
-        try:
-            self.mode = kwargs['mode']
-        except KeyError:
-            self.mode = fbmOpen
-        try:
-            self.path, self.name = os.path.split(kwargs['path'])
-        except KeyError:
-            self.path = ''
-            self.name = ''
+        self.mode = kwargs.get('mode', fbmOpen)
+        self.path, self.name = os.path.split(kwargs.get('path', ''))
         self.gtitle = self.ctitle = self.title
         mbm_file = os.path.join(self.private_path, 'file_browser_icons.mbm')
         mif_file = os.path.join(self.private_path, 'file_browser_icons.mif')
@@ -1103,10 +1096,13 @@ class FileBrowserWindow(Window):
         name, ext = os.path.splitext(name)
         path = None
         while True:
-            name = query(_('Name:'), 'text', name.decode('utf8'))
+            name = query(_('Name (%s):') % ext.decode('utf8'), 'text', name.decode('utf8'))
             if name is None:
                 return
             name = name.encode('utf8')
+            name, newext = os.path.splitext(name)
+            if newext:
+                ext = newext
             path = os.path.join(self.path, name + ext)
             if os.path.exists(path):
                 if os.path.isdir(path):
@@ -1141,10 +1137,13 @@ class FileBrowserWindow(Window):
             return
         name, ext = os.path.splitext(item[3])
         while True:
-            name = query(_('Name:'), 'text', name.decode('utf8'))
+            name = query(_('Name (%s):') % ext.decode('utf8'), 'text', name.decode('utf8'))
             if name is None:
                 break
             name = name.encode('utf8')
+            name, newext = os.path.splitext(name)
+            if newext:
+                ext = newext
             src = os.path.join(self.path, item[3])
             dst = os.path.join(self.path, name + ext)
             try:
