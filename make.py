@@ -51,7 +51,7 @@ def main():
             lambda: system('''mifconv file_browser_icons.mif /Ficons\\mif\\file_browser\\mifconv_input_file.txt''')),
         
         'ped.aif': (['ped.rss', 'ped.mbm'],
-            lambda: system('''set EPOCROOT=%s
+            lambda: system('''set PATH=%s\\Epoc32\\tools;%%PATH%%
                            aiftool ped ped.mbm''' % epocroot2)),
         
         'ped.pyo': (['ped.py'],
@@ -80,7 +80,8 @@ def main():
                            'Ped_%s_3rdEd_no_caps.sis' % verstr()))),
 
         'all': (['Ped_%s_2ndEd.sis' % verstr(),
-            'Ped_%s_3rdEd.sis' % verstr()],
+            'Ped_%s_3rdEd_unsigned_testrange.sis' % verstr(),
+            'Ped_%s_3rdEd_no_caps.sis' % verstr()],
             lambda: None),
     
     }
