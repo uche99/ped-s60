@@ -679,6 +679,7 @@ class TextFileWindow(TextWindow):
                 text = win.body.get()
                 encoding = win.encoding
                 if win.load()[0] == text:
+                    # file unchanged - no need to store the text
                     text = None
                 else:
                     raise IOError
@@ -688,7 +689,7 @@ class TextFileWindow(TextWindow):
                 path = win.path
             else:
                 path = win.title.encode('utf8')
-            state[path] = text, encoding
+            state[path] = text, encoding, win.body.get_pos()
         cls.session.save()
     store_session = classmethod(store_session)
 
@@ -1826,6 +1827,28 @@ class Application(object):
         self.browser_win = self.help_win = self.plugins_win = None
         self.unnamed_count = 1
         self.started_plugins = []
+        
+        # override __import__ to save and reload currently edited modules
+        def ped_import(name, globals=None, locals=None, fromlist=None):
+            # call original __import__
+            mod = py_import(name, globals, locals, fromlist)
+            try:
+                path = mod.__file__.lower()
+            except AttributeError:
+                pass
+            else:
+                for win in ui.screen.find_windows(PythonFileWindow):
+                    try:
+                        if win.path.lower() == path:
+                            win.save()
+                            return reload(mod)
+                    except AttributeError:
+                        pass
+            return mod
+        import __builtin__
+        global py_import
+        py_import = __builtin__.__import__
+        __builtin__.__import__ = ped_import
 
     def start(self):
         # load settings
@@ -1868,9 +1891,11 @@ class Application(object):
         TextFileWindow.session.load_if_available()
         state = TextFileWindow.session['state'].get()
         if state and ui.query(_('Last Ped session crashed. Reload its last state?'), 'query'):
-            for path, (text, encoding) in state.items():
+            for path, (text, encoding, pos) in state.items():
                 if text is None:
-                    self.load_file(path)
+                    win = self.load_file(path)
+                    if win:
+                        win.body.set_pos(pos)
                 else:
                     ext = os.path.splitext(path)[1].lower()
                     try:
@@ -1882,7 +1907,7 @@ class Application(object):
                         title=os.path.split(path)[1].decode('utf8'))
                     if win:
                         win.body.set(text)
-                        win.body.set_pos(0)
+                        win.body.set_pos(pos)
                         win.encoding = encoding
                         if os.path.split(path)[0]:
                             win.path = path
