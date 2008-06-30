@@ -1,7 +1,0 @@
-#summary How to donate the Ped project.
-
-= Introduction =
-
-Ped is totally free. However, if you would like to ensure its future development, feel free to donate. You can do so using the !PayPal link below.
-
-[https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=arkadiusz%2ewahlig%40googlemail%2ecom&item_name=Ped%20donation&no_shipping=1&tax=0&currency_code=EUR&lc=DE&bn=PP%2dDonationsBF&charset=UTF%2d8 https://www.paypal.com/en_US/i/btn/x-click-butcc-donate.gif]
