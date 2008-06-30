@@ -33,8 +33,8 @@ def main():
                        copy LICENSE build_3rdEd
                        mkdir build_3rdEd\\lang
                        xcopy lang build_3rdEd\\lang /s
-                       %s py2sis --vendor="Arkadiusz Wahlig" --icon=ped.svg --appname=Ped --version=%d.%02d --verbose %%s build_3rdEd %%s''' % \
-                       ((ensymble,) + version[:2])
+                       %s py2sis --vendor="Arkadiusz Wahlig" --icon=ped.svg --appname=Ped --version=%d.%d.%d --verbose %%s build_3rdEd %%s''' % \
+                       ((ensymble,) + version)
 
     # Rules
     rules = {
@@ -189,7 +189,7 @@ def verstr():
         tail = '_' + version_tail
     else:
         tail = ''
-    return '%d.%02d%s' % (version[:2] + (tail,))
+    return '%d.%02d.%d%s' % (version + (tail,))
 
 if __name__ == '__main__':
     main()
