@@ -35,7 +35,7 @@
 
 
 # application version
-__version__ = '2.30 beta'
+__version__ = '2.30.1 beta'
 
 
 import sys
@@ -1820,7 +1820,18 @@ class Application(object):
         self.settings = settings
 
         # setup file browser
-        ui.FileBrowserWindow.private_path = self.path
+        if e32.s60_version_info >= (3, 0):
+            # platsec
+            path = os.path.join(os.path.splitdrive(self.path)[0], '\\resource\\apps\\ped_file_browser_icons.mif')
+        elif e32.s60_version_info >= (2, 8):
+            # MIF files supported
+            path = os.path.join(self.path, 'ped_file_browser_icons.mif')
+        else:
+            path = None
+        if path is None or not os.path.exists(path):
+            path = os.path.join(self.path, 'ped_file_browser_icons.mbm')
+        ui.FileBrowserWindow.icons_path = path
+        ui.FileBrowserWindow.settings_path = os.path.join(self.path, 'ped_file_browser_settings.bin')
         ui.FileBrowserWindow.add_link('C:\\Python')
         ui.FileBrowserWindow.add_link('E:\\Python')
         if e32.s60_version_info < (3, 0):
