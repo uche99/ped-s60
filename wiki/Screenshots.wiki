@@ -1,14 +1,14 @@
 #summary Ped target device screenshots.
 #labels ped,screenshots
 
-==Ped 2.30 beta (r29) on Nokia N73==
+==Ped 2.30.0 beta (r29) on Nokia N73==
 Note the German user interface.
 
 http://ped-s60.googlecode.com/svn/trunk/screenshots/2.30%20beta/N73/Scr000018.jpg
 http://ped-s60.googlecode.com/svn/trunk/screenshots/2.30%20beta/N73/Scr000019.jpg
 http://ped-s60.googlecode.com/svn/trunk/screenshots/2.30%20beta/N73/Scr000020.jpg
 
-==Ped 2.30 beta (r18) on Nokia N73==
+==Ped 2.30.0 beta (r18) on Nokia N73==
 
 http://ped-s60.googlecode.com/svn/trunk/screenshots/2.30%20beta/N73/Scr000004.jpg
 http://ped-s60.googlecode.com/svn/trunk/screenshots/2.30%20beta/N73/Scr000005.jpg
