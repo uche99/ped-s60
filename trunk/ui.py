@@ -839,7 +839,7 @@ class FileBrowserWindow(Window):
             except:
                 self.icons[name] = Icon(mbm_file.decode('utf8'), mbm, mbm+1)
         self.settings = Settings(os.path.join(self.private_path, 'file_browser_settings.bin'))
-        self.settings.add_setting('default', 'recents', Setting(_('Recents'), []))
+        self.settings.add_setting('default', 'recents', Setting('Recents', []))
         self.settings.load_if_available()
         self.body = Listbox([(_('(empty)'), self.icons['info'])], self.select_click)
         self.keys += (EKeyLeftArrow, EKeyRightArrow, EKeyStar, EKey0, EKeyHash, EKeyBackspace)
@@ -945,7 +945,7 @@ class FileBrowserWindow(Window):
             except ValueError:
                 pass
         if not self.lstall:
-            self.lstall.append((self.INFO, self.icons['info'], _('(no files)'), None))
+            self.lstall.append((self.INFO, self.icons['info'], _('(empty)'), None))
         self.set_list(active, dofilter=True)
         self.make_menu()
 
@@ -1279,10 +1279,12 @@ class FloatSetting(NumberSetting):
             if v is None:
                 return False
             if self.vmin is not None and v < self.vmin:
-                note(_('Minimal value is %.2f') % self.vmin)
+                # we use %s to share a translatable string with NumberSetting
+                note(_('Minimal value is %s') % ('%.2f' % self.vmin))
                 continue
             if self.vmax is not None and v > self.vmax:
-                note(_('Maximal value is %.2f') % self.vmax)
+                # we use %s to share a translatable string with NumberSetting
+                note(_('Maximal value is %s') % ('%.2f' % self.vmax))
                 continue
             self.value = v
             break
