@@ -835,7 +835,8 @@ class FileBrowserWindow(Window):
             else:
                 self.icons[name] = Icon(path, mbm, mbm+1)
         self.settings = Settings(self.settings_path)
-        self.settings.add_setting('default', 'recents', Setting('Recents', []))
+        self.settings.add('main', SettingsGroup())
+        self.settings.main.add('recents', Setting('Recents', []))
         self.settings.load_if_available()
         self.body = Listbox([(_('(empty)'), self.icons['info'])], self.select_click)
         self.keys += (EKeyLeftArrow, EKeyRightArrow, EKeyStar, EKey0, EKeyHash, EKeyBackspace)
@@ -864,7 +865,7 @@ class FileBrowserWindow(Window):
     add_link = classmethod(add_link)
 
     def add_recent(self, filename):
-        recents = self.settings['recents'].get()
+        recents = self.settings.main.recents
         for name in recents:
             if name.lower() == filename.lower():
                 recents.remove(name)
@@ -898,7 +899,7 @@ class FileBrowserWindow(Window):
                 path, name = os.path.split(filename)
                 title = _('%s in %s') % (name.decode('utf8'), path.decode('utf8'))
                 return (self.FILE, self.get_file_icon(filename), title, filename)
-            recents = self.settings['recents'].get()
+            recents = self.settings.main.recents
             recentslen = len(recents)
             # remove deleted recents
             for filename in list(recents):
@@ -1454,16 +1455,63 @@ class CustomSetting(Setting):
                 self.value = v
 
 
-class Settings(object):
+class SettingsGroup(object):
+    def __init__(self, title=''):
+        self.title = title
+        self.objs = {}
+        self.order = []
+
+    def add(self, name, obj):
+        if isinstance(obj, Setting):
+            self.objs[name] = obj
+            self.order.append(name)
+        else:
+            raise TypeError('\'obj\' must be a Setting object')
+
+    def clear(self):
+        self.objs.clear()
+        self.order = []
+
+    def all(self):
+        return [(x, self.objs[x]) for x in self.order]
+
+    def get(self):
+        return self
+        
+    def set(self, value):
+        raise AttributeError('Cannot set a SettingsGroup (to %s)' % repr(value))
+
+    def __getitem__(self, name):
+        return self.objs[name]
+
+    def __getattr__(self, name):
+        if name == 'objs':
+            raise AttributeError
+        try:
+            obj = self.objs[name]
+        except KeyError:
+            raise AttributeError('%s object has no attribute %s' % (repr(self), repr(name)))
+        else:
+            return obj.get()
+
+    def __setattr__(self, name, value):
+        try:
+            obj = self.objs[name]
+        except (AttributeError, KeyError):
+            return object.__setattr__(self, name, value)
+        else:
+            obj.set(value)
+
+    def __contains__(self, name):
+        return name in self.objs
+
+
+class Settings(SettingsGroup):
     def __init__(self, filename, title=None):
         if title is None:
             title = _('Settings')
+        SettingsGroup.__init__(self, title)
         self.filename = filename
-        self.title = title
-        self.settings = {}
-        self.categories = {'default': Category()}
-        # categories order
-        self.order = []
         self.window = None
 
     def load(self):
@@ -1471,12 +1519,18 @@ class Settings(object):
         f = file(self.filename, 'rb')
         while True:
             try:
+                # all versions of the file had name-value pairs
                 name = marshal.load(f)
                 value = marshal.load(f)
                 try:
-                    self.settings[name].set(value)
+                    gname, name = name.split('/')
+                except ValueError:
+                    # old file version
+                    continue
+                try:
+                    self[gname][name].set(value)
                 except KeyError:
-                    # skip unknown/old settings
+                    # old settings / old file version
                     pass
             except EOFError:
                 break
@@ -1485,9 +1539,10 @@ class Settings(object):
     def save(self):
         import marshal
         f = file(self.filename, 'wb')
-        for name, value in self.settings.items():
-            marshal.dump(name, f)
-            marshal.dump(value.value, f)
+        for gname, group in self.all():
+            for name, item in group.all():
+                marshal.dump('%s/%s' % (gname, name), f)
+                marshal.dump(item.get(), f)
         f.close()
 
     def load_if_available(self):
@@ -1495,16 +1550,6 @@ class Settings(object):
             self.load()
         except IOError:
             pass
-
-    def add_category(self, name, category):
-        self.categories[name] = category
-        if name not in self.order:
-            self.order.append(name)
-
-    def add_setting(self, cat, name, setting):
-        assert cat in self.categories, 'unknown category'
-        self.settings[name] = setting
-        self.categories[cat].order.append(name)
 
     def edit(self):
         if self.window:
@@ -1517,34 +1562,18 @@ class Settings(object):
         self.window = None
         return r
 
-    def clear(self):
-        self.settings.clear()
-        self.categories.clear()
-        self.order = []
+    def add(self, name, obj):
+        if isinstance(obj, SettingsGroup):
+            self.objs[name] = obj
+            self.order.append(name)
+        else:
+            raise TypeError('\'obj\' must be a SettingsGroup object')
 
-    def keys(self):
-        return self.settings.keys()
-
-    def values(self):
-        return self.settings.values()
-
-    def items(self):
-        return self.settings.items()
-
-    def __len__(self):
-        return len(self.settings)
-
-    def __getitem__(self, name):
-        return self.settings[name]
-
-    def __contains__(self, name):
-        return name in self.settings
-
-
-class Category(object):
-    def __init__(self, title=u''):
-        self.title = title
-        self.order = []
+    def get(self):
+        raise TypeError('method not implemented')
+        
+    def set(self, value):
+        raise TypeError('method not implemented')
 
 
 class SettingsWindow(TabbedWindow):
@@ -1558,34 +1587,38 @@ class SettingsWindow(TabbedWindow):
         menu.append(MenuItem(_('Save'), target=self.save_click))
         menu.append(MenuItem(_('Exit'), target=self.close))
         tabs = []
-        for catname in self.settings.order:
-            category = self.settings.categories[catname]
-            if not category.order:
+        for gname, group in self.settings.all():
+            items = group.all()
+            if not items:
                 continue
-            tab = Tab(category.title)
-            tab.category = category
+            tab = Tab(group.title)
+            tab.group = group
             tab.menu = menu
-            tab.body = Listbox([(unicode(self.settings.settings[x].title), unicode(self.settings.settings[x])) for x in category.order],
-                self.change_click)
+            tab.body = Listbox([(unicode(item.title), unicode(item)) \
+                for name, item in items], self.change_click)
             tabs.append(tab)
         if not tabs:
-            raise RuntimeError('no settings to edit')
+            raise RuntimeError('No settings to edit')
         self.tabs = tabs
         self.modal_result = False
 
     def can_close(self):
         if not TabbedWindow.can_close(self):
             return False
-        items = [x for x in self.settings.settings.values() if x.changed()]
+        items = []
+        for gname, group in self.settings.all():
+            for name, item in group.all():
+                if item.changed():
+                    items.append(item)
         if items:
             if query(_('Save changes?'), 'query'):
-                for x in items:
-                    x.store()
+                for item in items:
+                    item.store()
                 self.settings.save()
                 self.modal_result = True
             else:
-                for x in items:
-                    x.restore()
+                for item in items:
+                    item.restore()
         return True
 
     def close(self):
@@ -1596,14 +1629,15 @@ class SettingsWindow(TabbedWindow):
 
     def change_click(self):
         tab = self.get_active_tab()
-        if self.settings.settings[tab.category.order[tab.body.current()]].edit():
-            tab.body.set_list([(unicode(self.settings.settings[x].title), unicode(self.settings.settings[x])) for x in tab.category.order],
-                tab.body.current())
+        if tab.group.all()[tab.body.current()][-1].edit():
+            tab.body.set_list([(unicode(item.title), unicode(item)) \
+                for name, item in tab.group.all()], tab.body.current())
 
     def save_click(self):
-        for x in self.settings.settings:
-            if x.changed():
-                x.store()
+        for gname, group in self.settings.all():
+            for name, item in group.all():
+                if item.changed():
+                    item.store()
         self.settings.save()
         self.modal_result = True
         note(_('Changes saved'))

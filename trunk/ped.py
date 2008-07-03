@@ -35,7 +35,7 @@
 
 
 # application version
-__version__ = '2.30.1 beta'
+__version__ = '2.30.2 beta'
 
 
 import sys
@@ -133,7 +133,7 @@ class RootWindow(ui.RootWindow, GlobalWindowModifier):
                 app.screen = size
                 # wait forever
                 lock.wait()
-            register(exithandler)
+            #register(exithandler)
 
     def redraw_callback(self, rect):
         ui.RootWindow.redraw_callback(self, rect)
@@ -344,11 +344,11 @@ class TextWindow(Window):
         self.body.set_pos(pos)
 
     def apply_settings(self):
-        self.set_style(font=app.settings['font'].get(),
-            size=app.settings['fontsize'].get(),
-            antialias=app.settings['fontantialias'].get(),
-            bold=app.settings['fontbold'].get(),
-            color=app.settings['defcolor'].get())
+        self.set_style(font=app.settings.editor.fontname,
+            size=app.settings.editor.fontsize,
+            antialias=app.settings.editor.fontantialias,
+            bold=app.settings.editor.fontbold,
+            color=app.settings.editor.color)
 
     def update_settings(cls):
         ui.screen.rootwin.focus = True
@@ -467,7 +467,7 @@ class TextWindow(Window):
         else:
             sett += 'norm'
         lines = self.get_lines()
-        i = self.get_line_from_pos(lines=lines)[0] - 1 - app.settings[sett].get() + delta
+        i = self.get_line_from_pos(lines=lines)[0] - 1 - app.settings.editor[sett].get() + delta
         if i < 0:
             i = 0
         self.body.set_pos(lines[i][1])
@@ -481,7 +481,7 @@ class TextWindow(Window):
         else:
             sett += 'norm'
         lines = self.get_lines()
-        i = self.get_line_from_pos(lines=lines)[0] - 1 + app.settings[sett].get() + delta
+        i = self.get_line_from_pos(lines=lines)[0] - 1 + app.settings.editor[sett].get() + delta
         if i >= len(lines):
             i = -1
         self.body.set_pos(lines[i][1])
@@ -550,8 +550,8 @@ class TextFileWindow(TextWindow):
         TextWindow.apply_settings(self)
         try:
             if not self.fixed_encoding:
-                self.encoding = app.settings['defenc'].get()
-            autosave = app.settings['autosaveinterval'].get()
+                self.encoding = app.settings.main.encoding
+            autosave = app.settings.main.autosave
             self.autosave_timer.cancel()
             if autosave and self.path is not None:
                 self.autosave_timer.after(autosave, self.autosave)
@@ -630,7 +630,7 @@ class TextFileWindow(TextWindow):
     def save(self):
         if self.path is None:
             return self.save_as()
-        autosave = app.settings['autosaveinterval'].get()
+        autosave = app.settings.main.autosave
         self.autosave_timer.cancel()
         if autosave:
             self.autosave_timer.after(autosave, self.autosave)
@@ -680,7 +680,7 @@ class TextFileWindow(TextWindow):
                 return
 
     def store_session(cls):
-        state = cls.session['state'].get()
+        state = cls.session.main.state
         state.clear()
         for win in ui.screen.find_windows(TextFileWindow):
             try:
@@ -702,7 +702,7 @@ class TextFileWindow(TextWindow):
     store_session = classmethod(store_session)
 
     def clear_session(cls):
-        cls.session['state'].get().clear()
+        cls.session.main.state.clear()
         cls.session.save()
     clear_session = classmethod(clear_session)
 
@@ -768,7 +768,7 @@ class PythonModifier(object):
             i += 1
         ind = i - strt
         if pos > 0 and text[pos - 1] == u':':
-            ind += app.settings['indent'].get()
+            ind += app.settings.editor.indent
         self.body.add(u' ' * ind)
 
     def py_autocomplete(self):
@@ -1005,7 +1005,7 @@ class PythonFileWindow(TextFileWindow, PythonModifier):
             except IOError, (errno, errstr):
                 ui.note(unicode(errstr), 'error')
                 return
-        if app.settings['askforargs'].get():
+        if app.settings.python.askforargs:
             menu = ui.Menu(_('Arguments'))
             if self.args:
                 menu.append(ui.MenuItem(_('Last: %s') % self.args, args=self.args))
@@ -1437,11 +1437,11 @@ class PythonShellWindow(IOWindow, PythonModifier):
             self.lock(False)
 
     def apply_settings(self):
-        self.set_style(font=app.settings['font'].get(),
-            size=app.settings['fontsize'].get(),
-            antialias=app.settings['fontantialias'].get(),
-            bold=app.settings['fontbold'].get(),
-            color=app.settings['shcolor'].get())
+        self.set_style(font=app.settings.editor.fontname,
+            size=app.settings.editor.fontsize,
+            antialias=app.settings.editor.fontantialias,
+            bold=app.settings.editor.fontbold,
+            color=app.settings.python.shellcolor)
 
     def history_click(self):
         win = ui.screen.create_window(HistoryWindow,
@@ -1465,7 +1465,7 @@ class PythonShellWindow(IOWindow, PythonModifier):
             return
         try:
             f = file(path, 'w')
-            f.write(self.body.get().replace(u'\u2029', u'\r\n').encode(app.settings['defenc'].get()))
+            f.write(self.body.get().replace(u'\u2029', u'\r\n').encode(app.settings.main.encoding))
             f.close()
         except IOError:
             ui.note(_('Cannot export the output!'), 'error')
@@ -1769,9 +1769,10 @@ class Application(object):
         # we have to load the language setting first; the real settings object
         # we will use in the app will be created later
         settings = ui.Settings(os.path.join(self.path, 'settings.bin'))
-        settings.add_setting('default', 'language', ui.ComboSetting('Language', u'English', alllanguages))
+        settings.add('main', ui.SettingsGroup())
+        settings.main.add('language', ui.ComboSetting('Language', u'English', alllanguages))
         settings.load_if_available()
-        self.language = settings['language'].get().encode('utf8')
+        self.language = settings.main.language.encode('utf8')
         if self.language != 'English':
             try:
                 # load the ped language file
@@ -1796,27 +1797,25 @@ class Application(object):
         if e32.s60_version_info >= (3, 0):
             allorientations += [(_('Portrait'), ui.oriPortrait), (_('Landscape'), ui.oriLandscape)]
         settings = ui.Settings(os.path.join(self.path, 'settings.bin'), title=_('Settings'))
-        settings.add_category('main', ui.Category(_('Main')))
-        settings.add_category('editor', ui.Category(_('Editor')))
-        settings.add_category('python', ui.Category(_('Python')))
-        settings.add_category('plugins', ui.Category(_('Plugins')))
-        # 'color', 'shellcolor', 'orientation' and 'autosave' IDs used old ValueComboSetting class
-        # and cannot be used with the new one
-        settings.add_setting('main', 'language', ui.ComboSetting(_('Language'), u'English', alllanguages))
-        settings.add_setting('main', 'scrorientation', ui.ValueComboSetting(_('Screen orientation'), allorientations[0][1], allorientations))
-        settings.add_setting('main', 'defenc', ui.ComboSetting(_('Default encoding'), 'utf-8', ('ascii', 'latin-1', 'utf-8', 'utf-16')))
-        settings.add_setting('main', 'autosaveinterval', ui.ValueComboSetting(_('Autosave'), 0, ((_('Off'), 0), (_('%d sec') % 30, 30), (_('%d min') % 1, 60), (_('%d min') % 2, 120), (_('%d min') % 5, 300), (_('%d min') % 10, 600))))
-        settings.add_setting('editor', 'font', ui.ComboSetting(_('Font'), defaultfont, allfonts))
-        settings.add_setting('editor', 'fontsize', ui.NumberSetting(_('Font size'), 12))
-        settings.add_setting('editor', 'fontantialias', ui.BoolSetting(_('Font anti-aliasing'), True))
-        settings.add_setting('editor', 'fontbold', ui.BoolSetting(_('Bold font'), False))
-        settings.add_setting('editor', 'defcolor', ui.ValueComboSetting(_('Color'), 0x000099, allcolors))
-        settings.add_setting('editor', 'pagesizenorm', ui.NumberSetting(_('Page size, normal'), 8, vmin=1, vmax=64))
-        settings.add_setting('editor', 'pagesizefull', ui.NumberSetting(_('Page size, full screen'), 11, vmin=1, vmax=64))
-        settings.add_setting('editor', 'pagesizeland', ui.NumberSetting(_('Page size, landscape'), 9, vmin=1, vmax=64))
-        settings.add_setting('python', 'askforargs', ui.BoolSetting(_('Ask for arguments'), False))
-        settings.add_setting('python', 'shcolor', ui.ValueComboSetting(_('Shell text color'), 0x008800, allcolors))
-        settings.add_setting('python', 'indent', ui.NumberSetting(_('Indentation size'), 4, vmin=1, vmax=8))
+        settings.add('main', ui.SettingsGroup(_('Main')))
+        settings.add('editor', ui.SettingsGroup(_('Editor')))
+        settings.add('python', ui.SettingsGroup(_('Python')))
+        settings.add('plugins', ui.SettingsGroup(_('Plugins')))
+        settings.main.add('language', ui.ComboSetting(_('Language'), u'English', alllanguages))
+        settings.main.add('orientation', ui.ValueComboSetting(_('Screen orientation'), allorientations[0][1], allorientations))
+        settings.main.add('encoding', ui.ComboSetting(_('Default encoding'), 'utf-8', ('ascii', 'latin-1', 'utf-8', 'utf-16')))
+        settings.main.add('autosave', ui.ValueComboSetting(_('Autosave'), 0, ((_('Off'), 0), (_('%d sec') % 30, 30), (_('%d min') % 1, 60), (_('%d min') % 2, 120), (_('%d min') % 5, 300), (_('%d min') % 10, 600))))
+        settings.editor.add('fontname', ui.ComboSetting(_('Font'), defaultfont, allfonts))
+        settings.editor.add('fontsize', ui.NumberSetting(_('Font size'), 12))
+        settings.editor.add('fontantialias', ui.BoolSetting(_('Font anti-aliasing'), True))
+        settings.editor.add('fontbold', ui.BoolSetting(_('Bold font'), False))
+        settings.editor.add('color', ui.ValueComboSetting(_('Color'), 0x000099, allcolors))
+        settings.editor.add('pagesizenorm', ui.NumberSetting(_('Page size, normal'), 8, vmin=1, vmax=64))
+        settings.editor.add('pagesizefull', ui.NumberSetting(_('Page size, full screen'), 11, vmin=1, vmax=64))
+        settings.editor.add('pagesizeland', ui.NumberSetting(_('Page size, landscape'), 9, vmin=1, vmax=64))
+        settings.python.add('askforargs', ui.BoolSetting(_('Ask for arguments'), False))
+        settings.python.add('shellcolor', ui.ValueComboSetting(_('Shell text color'), 0x008800, allcolors))
+        settings.python.add('indent', ui.NumberSetting(_('Indentation size'), 4, vmin=1, vmax=8))
         self.settings = settings
 
         # setup file browser
@@ -1840,7 +1839,8 @@ class Application(object):
 
         # setup session
         session = ui.Settings(os.path.join(self.path, 'session.bin'))
-        session.add_setting('default', 'state', ui.Setting('Files', {}))
+        session.add('main', ui.SettingsGroup())
+        session.main.add('state', ui.Setting('State', {}))
         TextFileWindow.session = session
 
         # properties initialization
@@ -1909,7 +1909,7 @@ class Application(object):
 
         # restore session
         TextFileWindow.session.load_if_available()
-        state = TextFileWindow.session['state'].get()
+        state = TextFileWindow.session.main.state
         if state and ui.query(_('Last Ped session crashed. Reload its last state?'), 'query'):
             for path, (text, encoding, pos) in state.items():
                 if text is None:
@@ -1994,8 +1994,8 @@ class Application(object):
     def apply_settings(self):
         TextWindow.update_settings()
         for win in ui.screen.find_windows():
-            win.orientation = self.settings['scrorientation'].get()
-        if self.language != self.settings['language'].get().encode('utf8'):
+            win.orientation = self.settings.main.orientation
+        if self.language != self.settings.main.language.encode('utf8'):
             ui.note(_('Restart Ped for the changes to take effect.'))
 
     def plugins_click(self):
@@ -2081,7 +2081,7 @@ class Application(object):
         self.browser_win = None
         if not path:
             return
-        if self.settings['askforargs'].get():
+        if self.settings.python.askforargs:
             menu = ui.Menu(_('Arguments'))
             menu.append(ui.MenuItem(_('Edit...')))
             menu.append(ui.MenuItem(_('No arguments')))
@@ -2126,7 +2126,7 @@ class Application(object):
             shell.enable_prompt(True)
 
     def orientation_click(self):
-        m = _m = self.settings['scrorientation'].get()
+        m = _m = self.settings.main.orientation
         if m == ui.oriAutomatic:
             w, h = ui.layout(ui.EApplicationWindow)[0]
             if w > h:
@@ -2138,7 +2138,7 @@ class Application(object):
         elif m == ui.oriLandscape:
             m = ui.oriPortrait
         if m != _m:
-            self.settings['scrorientation'].set(m)
+            self.settings.main.orientation = m
             self.settings.save()
             for win in ui.screen.find_windows():
                 win.orientation = m
