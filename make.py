@@ -125,7 +125,7 @@ def build_sis_pre3(ed):
     f.close()
     
     system('makesis.exe %s' % pkgname,
-        PATH='%s\\Epoc32\\tools;%' % (epocroot2, os.environ['path']))
+        PATH='%s\\Epoc32\\tools;%s' % (epocroot2, os.environ['path']))
     
     os.remove(pkgname)
     
