@@ -117,24 +117,6 @@ class RootWindow(ui.RootWindow, GlobalWindowModifier):
         self.old_stdio = sys.stdin, sys.stdout, sys.stderr
         sys.stdin = sys.stdout = sys.stderr = StdIOWrapper()
 
-        # stop Python from self closing to prevent data loss if for example
-        # the RED key is pressed
-        if e32.s60_version_info >= (3.0):
-            from atexit import register
-            self.exitlock = lock = e32.Ao_lock()
-            def exithandler():
-                if ui.screen.focused_window() == self:
-                    # no windows opened, let it quit
-                    return
-                # redraw screen, fix for disappearing top pane
-                from appuifw import app
-                size = app.screen
-                app.screen = 'full'
-                app.screen = size
-                # wait forever
-                lock.wait()
-            register(exithandler)
-
     def redraw_callback(self, rect):
         ui.RootWindow.redraw_callback(self, rect)
         if len(ui.screen.windows) == 1: # if the root window is the only one
@@ -163,9 +145,6 @@ class RootWindow(ui.RootWindow, GlobalWindowModifier):
     def shutdown(self):
         # restore stdio redirection
         sys.stdin, sys.stdout, sys.stderr = self.old_stdio
-        # disable red-key-close preventer (see __init__)
-        if hasattr(self, 'exitlock'):
-            self.exitlock.signal()
         # exit application
         ui.app.set_exit()
 
@@ -1911,6 +1890,9 @@ class Application(object):
         global py_import
         py_import = __builtin__.__import__
         __builtin__.__import__ = ped_import
+        
+        # store the session on exit
+        sys.exitfunc = TextFileWindow.store_session
 
     def start(self):
         # load settings
