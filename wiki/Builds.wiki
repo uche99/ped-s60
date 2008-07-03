@@ -16,7 +16,7 @@ Currently, every Ped release includes following SIS files:
   * Use this build if you have a phone supporting S60 3rd edition platform (all newer S60 phones).
   * This build have all the _User Blanket Grant_ and _Symbian Signed_ capabilities enabled. It is not signed so you will have to sign it for your phone before you will be able to install it. Thanks to the capabilities, you will be able to use most of your phone's features.
   * To sign it, go to [https://www.symbiansigned.com/app/page/public/openSignedOnline.do Open Signed Online], enter the IMEI number of your phone (enter {{{*}}}#06# on the standby screen to get it), your e-mail, select the downloaded SIS file and select *all* capabilities. Fill out the rest of the fields. You will receive a link to your signed SIS file in an e-mail.
-  * It uses an arbitrarily assigned UID from testrange (0xE111C2B6). You won't be able to install this version if you already have an application with such UID on your phone. This build has to use a testrange UID to make it possible to sign it using _Open Signed Online_.
+  * It uses an arbitrarily assigned UID from testrange (0xe9e58be1). You won't be able to install this version if you already have an application with such UID on your phone. This build has to use a testrange UID to make it possible to sign it using _Open Signed Online_.
 
 ==S60 2nd edition (2ndEd)==
 
