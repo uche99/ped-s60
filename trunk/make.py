@@ -43,18 +43,18 @@ def main():
         # 'dstfile': (['srcfile1', 'srcfile2'], make_function),
 
         'ped.mbm': (listdir('icons\\mbm\\app'),
-            lambda: system('''bmconv icons\\mbm\\app\\bmconv_input_file.txt''')),
+            lambda: system('''bmconv icons\\mbm\\app\\bmconv_input_file.txt''', EPOCROOT='')),
         
         'ped_file_browser_icons.mbm': (listdir('icons\\mbm\\file_browser'),
-            lambda: system('''set EPOCROOT=
-                           bmconv icons\\mbm\\file_browser\\bmconv_input_file.txt''')),
+            lambda: system('''bmconv icons\\mbm\\file_browser\\bmconv_input_file.txt''', EPOCROOT='')),
         
         'ped_file_browser_icons.mif': (listdir('icons\\mif\\file_browser'),
             lambda: system('''mifconv ped_file_browser_icons.mif /Ficons\\mif\\file_browser\\mifconv_input_file.txt''')),
         
         'ped.aif': (['ped.rss', 'ped.mbm'],
-            lambda: system('''set PATH=%s\\Epoc32\\tools;%%PATH%%
-                           aiftool ped ped.mbm''' % epocroot2)),
+            lambda: system('''aiftool ped ped.mbm''',
+                           PATH='%s\\Epoc32\\tools;%s' % (epocroot2, os.environ['path']),
+                           EPOCROOT='')),
         
         'ped.pyo': (['ped.py'],
             lambda: system('''%s -O compile.py ped.py
@@ -124,7 +124,8 @@ def build_sis_pre3(ed):
     f.writelines(lines)
     f.close()
     
-    system('%s\\Epoc32\\tools\\makesis.exe %s' % (epocroot2, pkgname))
+    system('makesis.exe %s' % pkgname,
+        PATH='%s\\Epoc32\\tools;%' % (epocroot2, os.environ['path']))
     
     os.remove(pkgname)
     
@@ -181,7 +182,8 @@ def make(rules, name, build=False):
 def listdir(name):
     return map(lambda x: os.path.join(name, x), os.listdir(name))
 
-def system(cmds):
+def system(cmds, **envargs):
+    os.environ.update(envargs)
     for c in cmds.splitlines():
         c = c.strip()
         if not c.startswith('#'):
