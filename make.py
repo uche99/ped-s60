@@ -9,7 +9,7 @@ import sys
 import getopt
 
 # Version (major, minor, build)
-version = (2, 30, 1)
+version = (2, 30, 2)
 version_tail = 'beta'
 
 # python 2.2 binary path
@@ -71,12 +71,14 @@ def main():
         
         'Ped_%s_3rdEd_unsigned_testrange.sis' % verstr():
             (['default.py', 'ped.pyo', 'ui.pyo', 'ped.svg', 'ped_file_browser_icons.mif', 'LICENSE'],
+            # Note. We let ensymble choose a test-range UID for us based on 'Ped' name.
             lambda: system(ped_3rded_system % \
-                           ('--uid=0xE111C2B6 --caps=PowerMgmt+ReadDeviceData+WriteDeviceData+TrustedUI+ProtServ+SwEvent+NetworkServices+LocalServices+ReadUserData+WriteUserData+Location+SurroundingsDD+UserEnvironment',
+                           ('--caps=PowerMgmt+ReadDeviceData+WriteDeviceData+TrustedUI+ProtServ+SwEvent+NetworkServices+LocalServices+ReadUserData+WriteUserData+Location+SurroundingsDD+UserEnvironment',
                            'Ped_%s_3rdEd_unsigned_testrange.sis' % verstr()))),
     
         'Ped_%s_3rdEd_no_caps.sis' % verstr():
             (['default.py', 'ped.pyo', 'ui.pyo', 'ped.svg', 'ped_file_browser_icons.mif', 'LICENSE'],
+            # Note. This UID was registered on symbiansigned.com
             lambda: system(ped_3rded_system % \
                            ('--uid=0xA00042B5',
                            'Ped_%s_3rdEd_no_caps.sis' % verstr()))),
