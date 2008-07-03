@@ -12,13 +12,13 @@ import getopt
 version = (2, 30, 2)
 version_tail = 'beta'
 
-# python 2.2 binary path
-python22 = 'c:\\python22\\python.exe'
+# full path to python 2.2 binary
+python22 = 'C:\\Python22\\python.exe'
 
-# 2nd edition EPOCROOT
-epocroot2 = 'c:\\symbian\\7.0s\\Series60_v20_CW'
+# full path to 2nd edition EPOCROOT
+epocroot2 = 'C:\\Symbian\\7.0s\\Series60_v20_CW'
 
-# ensymble 0.27+ path
+# full path to ensymble 0.27+
 ensymble = 'ensymble.py'
 
 def main():
@@ -34,7 +34,7 @@ def main():
                        xcopy lang build_3rdEd\\lang /s
                        mkdir build_3rdEd\\root\\resource\\apps
                        copy ped_file_browser_icons.mif build_3rdEd\\root\\resource\\apps
-                       %s py2sis --vendor="Arkadiusz Wahlig" --icon=ped.svg --appname=Ped --version=%d.%d.%d --extrasdir=root --verbose %%s build_3rdEd %%s''' % \
+                       %s py2sis --vendor="Arkadiusz Wahlig" --icon=ped.svg --appname=Ped --version=%d.%d.%d --extrasdir=root --lang=EN,GE --verbose %%s build_3rdEd %%s''' % \
                        ((ensymble,) + version)
 
     # Rules
@@ -124,7 +124,7 @@ def build_sis_pre3(ed):
     f.writelines(lines)
     f.close()
     
-    system('makesis.exe ' + pkgname)
+    system('%s\\Epoc32\\tools\\makesis.exe %s' % (epocroot2, pkgname))
     
     os.remove(pkgname)
     

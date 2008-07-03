@@ -133,7 +133,7 @@ class RootWindow(ui.RootWindow, GlobalWindowModifier):
                 app.screen = size
                 # wait forever
                 lock.wait()
-            #register(exithandler)
+            register(exithandler)
 
     def redraw_callback(self, rect):
         ui.RootWindow.redraw_callback(self, rect)
@@ -158,13 +158,16 @@ class RootWindow(ui.RootWindow, GlobalWindowModifier):
     def close(self):
         r = ui.RootWindow.close(self)
         if r:
-            # restore stdio redirection
-            sys.stdin, sys.stdout, sys.stderr = self.old_stdio
-            # disable red-key-close preventer (see __init__)
-            if hasattr(self, 'exitlock'):
-                self.exitlock.signal()
-            # exit application
-            ui.app.set_exit()
+            self.shutdown()
+    
+    def shutdown(self):
+        # restore stdio redirection
+        sys.stdin, sys.stdout, sys.stderr = self.old_stdio
+        # disable red-key-close preventer (see __init__)
+        if hasattr(self, 'exitlock'):
+            self.exitlock.signal()
+        # exit application
+        ui.app.set_exit()
 
     def key_press(self, key):
         if key == ui.EKeySelect:
@@ -757,19 +760,37 @@ class PythonModifier(object):
     def py_insert_indent(self):
         text, pos = self._get_text()
         pos -= 1
-        i = pos - 1
+        i = pos-1
+        # walk back to the start of line
         while i >= 0:
             if text[i] == u'\u2029':
                 break
             i -= 1
         i += 1
         strt = i
+        # walk forward to the start of text
         while i < pos and text[i].isspace():
             i += 1
-        ind = i - strt
-        if pos > 0 and text[pos - 1] == u':':
-            ind += app.settings.editor.indent
-        self.body.add(u' ' * ind)
+        # calculate indent of the previous line
+        ind = i-strt
+        if pos > 0:
+            if text[pos-1] == u':':
+                # add more indent if line ends with a colon
+                ind += app.settings.python.indent
+            else:
+                # add more indent if line has unmatched brackets
+                level = 0
+                # i is already set here
+                #i = strt+ind
+                while i < pos:
+                    if text[i] in u'([{':
+                        level += 1
+                    elif text[i] in u')]}':
+                        level -= 1
+                    i += 1
+                if level > 0:
+                    ind += app.settings.python.indent
+        self.body.add(u' '*ind)
 
     def py_autocomplete(self):
         text, pos = self._get_text()
@@ -1026,14 +1047,11 @@ class PythonFileWindow(TextFileWindow, PythonModifier):
             self.args = u''
             args = []
         shell = StdIOWrapper.shell()
-        if shell.is_locked():
-            ui.note(_('Shell is busy!'), 'error')
+        if shell.is_busy():
             return
         shell.restart()
         shell.enable_prompt(False)
         shell.lock(True)
-        ui.app.menu = []
-        ui.app.exit_key_handler = ui.screen.rootwin.close
         # list() will make copies so we will be able to restore these later
         mysys = list(sys.argv), list(sys.path), dict(sys.modules)
         sys.path.insert(0, os.path.split(path)[0])
@@ -1163,7 +1181,8 @@ class IOWindow(TextWindow):
     def control_key_press(self, key):
         if key == ui.EKeyBackspace:
             if self.locked == False:
-                self.locked = True
+                # cause an KeyboardInterrupt in flush()
+                self.interrupt()
             return True
         else:
             return TextWindow.control_key_press(self, key)
@@ -1183,8 +1202,15 @@ class IOWindow(TextWindow):
             self.event.set()
             return False
         if self.is_locked():
+            if self.is_interrupted():
+                # user already interrupted the window but the interrupt status
+                # wasn't processed, now he's trying again; ask him if he wants 
+                # to close the app
+                if ui.query(_('Kill unresponding window by closing Ped?'), 'query'):
+                    # allow to close the window, see also: close()
+                    return True
             # cause an KeyboardInterrupt in flush()
-            self.locked = True
+            self.interrupt()
             return False
         return TextWindow.can_close(self)
 
@@ -1193,6 +1219,10 @@ class IOWindow(TextWindow):
         if r:
             # explicitly delete ao_callgate object to destroy circular reference
             del self.flush_gate
+            if self.is_interrupted():
+                # forcing a close (see: can_close())
+                TextFileWindow.store_session()
+                ui.screen.rootwin.shutdown()
         return r
 
     def lock(self, enable):
@@ -1203,6 +1233,14 @@ class IOWindow(TextWindow):
 
     def is_locked(self):
         return self.locked is not None
+
+    def interrupt(self):
+        self.locked = True
+        if hasattr(ui, 'infopopup'):
+            ui.infopopup.show(u'KeyboardInterrupt')
+
+    def is_interrupted(self):
+        return self.locked == True
 
     def readline(self, size=None):
         if not e32.is_ui_thread():
@@ -1245,8 +1283,8 @@ class IOWindow(TextWindow):
                 self.do_flush()
             else:
                 self.flush_gate()
-        if self.locked == True:
-            self.locked = False
+        if self.is_interrupted():
+            self.lock(True)
             raise KeyboardInterrupt
 
 
@@ -1443,7 +1481,15 @@ class PythonShellWindow(IOWindow, PythonModifier):
             bold=app.settings.editor.fontbold,
             color=app.settings.python.shellcolor)
 
+    def is_busy(self):
+        if self.is_locked():
+            ui.note(_('%s is busy!') % self.title, 'error')
+            return True
+        return False
+
     def history_click(self):
+        if self.is_busy():
+            return
         win = ui.screen.create_window(HistoryWindow,
                     history=self.history,
                     ptr=self.history_ptr)
@@ -1793,16 +1839,12 @@ class Application(object):
         else:
             defaultfont = allfonts[0]
         allcolors = ((_('Black'), 0x000000), (_('Red'), 0x990000), (_('Green'), 0x008800), (_('Blue'), 0x000099), (_('Purple'), 0x990099))
-        allorientations = [(_('Automatic'), ui.oriAutomatic)]
-        if e32.s60_version_info >= (3, 0):
-            allorientations += [(_('Portrait'), ui.oriPortrait), (_('Landscape'), ui.oriLandscape)]
         settings = ui.Settings(os.path.join(self.path, 'settings.bin'), title=_('Settings'))
         settings.add('main', ui.SettingsGroup(_('Main')))
         settings.add('editor', ui.SettingsGroup(_('Editor')))
         settings.add('python', ui.SettingsGroup(_('Python')))
         settings.add('plugins', ui.SettingsGroup(_('Plugins')))
         settings.main.add('language', ui.ComboSetting(_('Language'), u'English', alllanguages))
-        settings.main.add('orientation', ui.ValueComboSetting(_('Screen orientation'), allorientations[0][1], allorientations))
         settings.main.add('encoding', ui.ComboSetting(_('Default encoding'), 'utf-8', ('ascii', 'latin-1', 'utf-8', 'utf-16')))
         settings.main.add('autosave', ui.ValueComboSetting(_('Autosave'), 0, ((_('Off'), 0), (_('%d sec') % 30, 30), (_('%d min') % 1, 60), (_('%d min') % 2, 120), (_('%d min') % 5, 300), (_('%d min') % 10, 600))))
         settings.editor.add('fontname', ui.ComboSetting(_('Font'), defaultfont, allfonts))
@@ -1897,7 +1939,7 @@ class Application(object):
         tools_menu.append(ui.MenuItem(_('Help'), target=self.help_click))
         tools_menu.append(ui.MenuItem(_('Orientation'), target=self.orientation_click))
         main_menu.append(ui.MenuItem(_('Tools'), submenu=tools_menu))
-        main_menu.append(ui.MenuItem(_('Exit'), target=ui.screen.rootwin.close))
+        main_menu.append(ui.MenuItem(_('Exit'), target=self.exit_click))
         ui.screen.rootwin.menu = main_menu
 
         # load and apply settings
@@ -1910,7 +1952,7 @@ class Application(object):
         # restore session
         TextFileWindow.session.load_if_available()
         state = TextFileWindow.session.main.state
-        if state and ui.query(_('Last Ped session crashed. Reload its last state?'), 'query'):
+        if state and ui.query(_('Restore previous session?'), 'query'):
             for path, (text, encoding, pos) in state.items():
                 if text is None:
                     win = self.load_file(path)
@@ -1978,7 +2020,21 @@ class Application(object):
                 self.settings.load_if_available()
                 self.apply_settings()
             ui.screen.redraw()
-            
+    
+    def exit_click(self):
+        if ui.screen.find_windows(TextFileWindow):
+            menu = ui.Menu(_('Exit'))
+            menu.append(ui.MenuItem(_('Close all files'), store=False))
+            menu.append(ui.MenuItem(_('Store the session'), store=True))
+            item = menu.popup()
+            if item is None:
+                return
+            if item.store:
+                TextFileWindow.store_session()
+                ui.screen.rootwin.shutdown()
+                return
+        ui.screen.rootwin.close()
+        
     def new_file(self, klass):
         title = 'Unnamed%d%s' % (self.unnamed_count, klass.type_ext)
         self.unnamed_count += 1
@@ -1993,8 +2049,6 @@ class Application(object):
 
     def apply_settings(self):
         TextWindow.update_settings()
-        for win in ui.screen.find_windows():
-            win.orientation = self.settings.main.orientation
         if self.language != self.settings.main.language.encode('utf8'):
             ui.note(_('Restart Ped for the changes to take effect.'))
 
@@ -2098,15 +2152,12 @@ class Application(object):
         else:
             args = []
         shell = StdIOWrapper.shell()
-        if shell.is_locked():
-            ui.note(_('Shell is busy!'), 'error')
+        if shell.is_busy():
             return
         shell.restart()
         shell.enable_prompt(False)
         shell.lock(True)
         TextFileWindow.store_session()
-        ui.app.menu = []
-        ui.app.exit_key_handler = ui.screen.rootwin.close
         # list() will make copies so we will be able to restore these later
         mysys = list(sys.argv), list(sys.path)
         sys.path.insert(0, os.path.split(path)[0])
@@ -2126,22 +2177,30 @@ class Application(object):
             shell.enable_prompt(True)
 
     def orientation_click(self):
-        m = _m = self.settings.main.orientation
-        if m == ui.oriAutomatic:
+        win = ui.screen.focused_window()
+        ori = newori = win.orientation
+        if ori == ui.oriAutomatic:
             w, h = ui.layout(ui.EApplicationWindow)[0]
             if w > h:
-                m = ui.oriPortrait
+                newori = ui.oriPortrait
             else:
-                m = ui.oriLandscape
-        elif m == ui.oriPortrait:
-            m = ui.oriLandscape
-        elif m == ui.oriLandscape:
-            m = ui.oriPortrait
-        if m != _m:
-            self.settings.main.orientation = m
-            self.settings.save()
+                newori = ui.oriLandscape
+        else:
+            win.orientation = ui.oriAutomatic
+            w, h = ui.layout(ui.EApplicationWindow)[0]
+            if ori == ui.oriPortrait:
+                if w > h:
+                    newori = ui.oriAutomatic
+                else:
+                    newori = ui.oriLandscape
+            elif ori == ui.oriLandscape:
+                if w > h:
+                    newori = ui.oriPortrait
+                else:
+                    newori = ui.oriAutomatic
+        if newori != ori:
             for win in ui.screen.find_windows():
-                win.orientation = m
+                win.orientation = newori
                 if isinstance(win, TextWindow):
                     win.reset_caret()
 

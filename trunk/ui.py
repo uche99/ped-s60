@@ -650,6 +650,7 @@ class RootWindow(Window):
         Window.__init__(self, *args, **kwargs)
         self.body = Canvas(redraw_callback=self.redraw_callback,
                            event_callback=self.event_callback)
+        self.call_after_timers = []
 
     def redraw_callback(self, rect):
         self.body.clear(0x888888)
@@ -663,9 +664,23 @@ class RootWindow(Window):
             # close all windows except root window
             if not self._Window__screen.close_windows():
                 return False
+            # cancel all call_after() timers
+            for timer in self.call_after_timers:
+                timer.cancel()
+            self.call_after_timers = []
             # close root window (self)
             return Window.close(self)
         return False
+    
+    def __callsub(self, timer, target, args, kwargs):
+        self.call_after_timers.remove(timer)
+        target(*args, **kwargs)
+        
+    def call_after(self, delay, target, *args, **kwargs):
+        timer = e32.Ao_timer()
+        self.call_after_timers.append(timer)
+        timer.after(delay, lambda: self.__callsub(timer, target, args, kwargs))
+        return timer
 
 
 class BlankWindow(Window):
