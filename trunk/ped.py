@@ -1106,35 +1106,48 @@ class PythonFileWindow(TextFileWindow, PythonModifier):
             self.body.set_pos(item.pos)
 
     def parse_code(self):
-        lines = self.get_lines()
-        end = {'class' : '.', 'def' : '()'}
-        last = root = {}
-        lev = [(0, root)] # indent, tree
-        off = 0
-        for lnum, lpos, ln in lines:
-            coff = off
-            off += len(ln) + 1
-            ln = ln.rstrip()
-            t = ln.lstrip()
-            if t == u'' or t[0] == u'#':
+        lines = []
+        idx = 0
+        for lnum, lpos, ln in self.get_lines():
+            t = ln.strip()
+            if not t:
                 continue
             ind = ln.find(t[0])
-            t = t.split()
+            lines.append((idx, ind, lpos, t))
+            idx += 1
+        end = {u'class' : u'.', u'def' : u'()'}
+        last = root = {}
+        lev = [(0, root)] # indent, tree
+        for idx, ind, lpos, ln in lines:
+            t = ln.split()
             if ind < lev[-1][0]:
+                if idx > 0:
+                    if lines[idx-1][-1][-1] in (u',', u'\\'):
+                        # current line is a continuation of previous line
+                        lines[idx] = (idx, lines[idx-1][1], lpos, ln)
+                        continue
+                    if ind < lines[idx-1][1]:
+                        pln = lines[idx-1][-1]
+                        p = max(pln.find("'''"), pln.find('"""'))
+                        if p >= 0 and p == max(pln.rfind("'''"), pln.rfind('"""')):
+                            # current line is a continuation of multiline comment
+                            lines[idx] = (idx, lines[idx-1][1], lpos, ln)
+                            continue
                 try:
                     while ind < lev[-1][0]:
                         lev.pop()
                 except IndexError:
+                    # error
                     return
             elif ind > lev[-1][0]:
                 lev.append((ind, last))
-            if t[0] in (u'class', u'def'):
+            if t[0] in end.keys():
                 tok = t[1].split(u'(')[0].split(u':')[0]
                 name = tok + end[t[0]]
                 if name in lev[-1][1]:
-                    name = u'%s/%d%s' % (tok, coff + ind, end[t[0]])
+                    name = u'%s/%d%s' % (tok, lpos + ind, end[t[0]])
                 last = {}
-                lev[-1][1][name] = (coff + ind, last)
+                lev[-1][1][name] = (lpos + ind, last)
         return root
 
 
