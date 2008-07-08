@@ -42,13 +42,13 @@ def main():
     
         # 'dstfile': (['srcfile1', 'srcfile2'], make_function),
 
-        'ped.mbm': (listdir('icons\\mbm\\app'),
+        'ped.mbm': (listfiles('icons\\mbm\\app'),
             lambda: system('''bmconv icons\\mbm\\app\\bmconv_input_file.txt''', EPOCROOT='')),
         
-        'ped_file_browser_icons.mbm': (listdir('icons\\mbm\\file_browser'),
+        'ped_file_browser_icons.mbm': (listfiles('icons\\mbm\\file_browser'),
             lambda: system('''bmconv icons\\mbm\\file_browser\\bmconv_input_file.txt''', EPOCROOT='')),
         
-        'ped_file_browser_icons.mif': (listdir('icons\\mif\\file_browser'),
+        'ped_file_browser_icons.mif': (listfiles('icons\\mif\\file_browser'),
             lambda: system('''mifconv ped_file_browser_icons.mif /Ficons\\mif\\file_browser\\mifconv_input_file.txt''')),
         
         'ped.aif': (['ped.rss', 'ped.mbm'],
@@ -91,7 +91,7 @@ def main():
     }
 
     # Removes temporary 2nd ed. development files
-    map(os.remove, listdir('system\\apps\\ped'))
+    map(os.remove, listfiles('system\\apps\\ped'))
 
     # Parse arguments
     opts, args = getopt.gnu_getopt(sys.argv[1:], 'B')
@@ -179,8 +179,9 @@ def make(rules, name, build=False):
     else:
         print '>', name + ': nothing to do'
 
-def listdir(name):
-    return map(lambda x: os.path.join(name, x), os.listdir(name))
+def listfiles(folder):
+    return [os.path.join(folder, x) for x in os.listdir(folder) \
+        if os.path.isfile(os.path.join(folder, x))]
 
 def system(cmds, **envargs):
     os.environ.update(envargs)
