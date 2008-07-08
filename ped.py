@@ -1048,6 +1048,8 @@ class PythonFileWindow(TextFileWindow, PythonModifier):
         shell.restart()
         shell.enable_prompt(False)
         shell.lock(True)
+        from linecache import checkcache
+        checkcache()
         # list() will make copies so we will be able to restore these later
         mysys = list(sys.argv), list(sys.path), dict(sys.modules)
         sys.path.insert(0, os.path.split(path)[0])
@@ -2169,6 +2171,8 @@ class Application(object):
         shell.restart()
         shell.enable_prompt(False)
         shell.lock(True)
+        from linecache import checkcache
+        checkcache()
         TextFileWindow.store_session()
         # list() will make copies so we will be able to restore these later
         mysys = list(sys.argv), list(sys.path)
