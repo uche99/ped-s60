@@ -35,7 +35,7 @@
 
 
 # application version
-__version__ = '2.30.2 beta'
+__version__ = '2.30.3 beta'
 
 
 import sys
@@ -939,6 +939,7 @@ class PythonFileWindow(TextFileWindow, PythonModifier):
     def __init__(self, *args, **kwargs):
         TextFileWindow.__init__(self, *args, **kwargs)
         PythonModifier.__init__(self)
+        self.keys += (ui.EKeyHome,)
         self.control_keys += (ui.EKey1, ui.EKey5, ui.EKeySelect, ui.EKey8)
         self.args = u''
 
@@ -953,6 +954,22 @@ class PythonFileWindow(TextFileWindow, PythonModifier):
     def enter_key_press(self):
         TextFileWindow.enter_key_press(self)
         self.py_insert_indent()
+
+    def key_press(self, key):
+        if key == ui.EKeyHome:
+            # emulate the behavior of our move_beg_of_line() if Home key on an
+            # external keyboard is pressed
+            pos = self.body.get_pos()
+            lnum, offset, ln = self.get_line_from_pos(pos)
+            try:
+                indent = ln.index(ln.lstrip()[0])
+            except:
+                indent = 0
+            if indent != pos - offset:
+                ui.screen.rootwin.call_after(0.0, self.move_beg_of_line)
+        else:
+            return TextFileWindow.key_press(self, key)
+        return False
 
     def control_key_press(self, key):
         if key == ui.EKey1:
