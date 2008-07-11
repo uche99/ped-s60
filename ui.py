@@ -810,6 +810,7 @@ class FileBrowserWindow(Window):
     links = []
     icons_path = ''
     settings_path = ''
+    max_recents = 7
 
     def __init__(self, *args, **kwargs):
         if 'title' not in kwargs:
@@ -817,6 +818,8 @@ class FileBrowserWindow(Window):
         Window.__init__(self, *args, **kwargs)
         self.mode = kwargs.get('mode', fbmOpen)
         self.path, self.name = os.path.split(kwargs.get('path', ''))
+        # gtitle is the global title, 'File browser' or set by user
+        # ctitle is the current title, together with filter they make the window title
         self.gtitle = self.ctitle = self.title
         if not os.path.exists(self.icons_path):
             raise IOError('Missing file browser icons file')
@@ -872,7 +875,7 @@ class FileBrowserWindow(Window):
                 recents.remove(name)
                 break
         else:
-            if len(recents) == 5:
+            if len(recents) == self.max_recents:
                 recents.pop()
         recents.insert(0, filename)
         self.settings.save()
@@ -889,13 +892,17 @@ class FileBrowserWindow(Window):
         if self.path == '':
             self.ctitle = self.gtitle
             e32.ao_yield()
+            # drives
             self.lstall = [(self.DRIVE, self.icons['drive'], x, x.encode('utf8')) for x in e32.drive_list()]
+            # links
             def format(link):
                 if os.path.isfile(link[0]):
                     return (self.FILE, self.get_file_icon(link[0]), link[1], link[0])
                 else:
                     return (self.DIR, self.icons['folder'], link[1], link[0])
             self.lstall += map(format, self.links)
+        elif self.path == 'recents':
+            self.ctitle = _('Recent files')
             def format(filename):
                 path, name = os.path.split(filename)
                 title = _('%s in %s') % (name.decode('utf8'), path.decode('utf8'))
@@ -908,7 +915,7 @@ class FileBrowserWindow(Window):
                     recents.remove(filename)
             if len(recents) != recentslen:
                 self.settings.save()
-            self.lstall += map(format, recents)
+            self.lstall = map(format, recents)
         else:
             if self.path[-2:] == ':\\':
                 # we are in drive's root directory
@@ -936,6 +943,9 @@ class FileBrowserWindow(Window):
                 return -1
             return -(unicode(a[2]).lower() < unicode(b[2]).lower())
         self.lstall.sort(compare)
+        if self.path == '':
+            # add link to recent files at the top
+            self.lstall.insert(0, (self.DIR, self.icons['folder'], _('Recent files'), 'recents'))
         active = 0
         if mark != '':
             try:
@@ -950,7 +960,10 @@ class FileBrowserWindow(Window):
     def make_menu(self):
         menu = Menu()
         menu.append(MenuItem(_('Open'), target=self.select_click))
-        if self.path != '':
+        if self.path == 'recents':
+            menu.append(MenuItem(_('Drives'), target=self.drives_click))
+            menu.append(MenuItem(_('Delete'), target=self.delete_click))
+        elif self.path != '':
             if self.mode == fbmSave:
                 menu.append(MenuItem(_('Save here...'), target=self.save_click))
             menu.append(MenuItem(_('Parent'), target=self.parent_click))
@@ -1007,6 +1020,8 @@ class FileBrowserWindow(Window):
             self.update()
         elif item[0] == self.FILE:
             if self.mode == fbmOpen:
+                if self.path == 'recents':
+                    self.path = ''
                 self.path = os.path.join(self.path, item[3])
                 self.modal_result = self.path
                 self.add_recent(self.path)
