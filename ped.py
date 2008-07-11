@@ -509,7 +509,9 @@ class FindResultsWindow(Window):
 class TextFileWindow(TextWindow):
     type_name = 'Text'
     type_ext = '.txt'
-    session = ui.Settings('')
+    session = ui.Settings('TextFileWindow.session')
+    session.add('main', ui.SettingsGroup())
+    session.main.add('windows', ui.Setting('TextFileWindows', []))
 
     def __init__(self, *args, **kwargs):
         TextWindow.__init__(self, *args, **kwargs)
@@ -662,8 +664,8 @@ class TextFileWindow(TextWindow):
                 return
 
     def store_session(cls):
-        state = cls.session.main.state
-        state.clear()
+        windows = cls.session.main.windows
+        del windows[:]
         for win in ui.screen.find_windows(TextFileWindow):
             try:
                 text = win.body.get()
@@ -679,12 +681,12 @@ class TextFileWindow(TextWindow):
                 path = win.path
             else:
                 path = win.title.encode('utf8')
-            state[path] = text, encoding, win.body.get_pos()
+            windows.insert(0, (path, text, encoding, win.body.get_pos()))
         cls.session.save()
     store_session = classmethod(store_session)
 
     def clear_session(cls):
-        cls.session.main.state.clear()
+        del cls.session.main.windows[:]
         cls.session.save()
     clear_session = classmethod(clear_session)
 
@@ -1891,10 +1893,7 @@ class Application(object):
                 ui.FileBrowserWindow.add_link('C:\\System\\Apps\\Python', _('Python Shell'))
 
         # setup session
-        session = ui.Settings(os.path.join(self.path, 'session.bin'))
-        session.add('main', ui.SettingsGroup())
-        session.main.add('state', ui.Setting('State', {}))
-        TextFileWindow.session = session
+        TextFileWindow.session.set_filename(os.path.join(self.path, 'session.bin'))
 
         # properties initialization
         self.browser_win = self.help_win = self.plugins_win = None
@@ -1964,10 +1963,16 @@ class Application(object):
         ui.schedule(self.start_plugins)
 
         # restore session
+        self.restore_session()
+        
+        # the ui is set up now so we can simply leave and the launchpad will keep us
+        # running until appuifw.app.set_exit() is called (see: RootWindow.close)
+
+    def restore_session(self):
         TextFileWindow.session.load_if_available()
-        state = TextFileWindow.session.main.state
-        if state and ui.query(_('Restore previous session?'), 'query'):
-            for path, (text, encoding, pos) in state.items():
+        windows = TextFileWindow.session.main.windows
+        if windows and ui.query(_('Restore previous session?'), 'query'):
+            for path, text, encoding, pos in windows:
                 if text is None:
                     win = self.load_file(path)
                     if win:
@@ -1991,14 +1996,11 @@ class Application(object):
                         else:
                             win.fixed_encoding = False
                         win.focus = True
-        state.clear()
+        del windows[:]
         try:
             TextFileWindow.session.save()
         except IOError:
             ui.note(_('Cannot update session file!'), 'error')
-
-        # the ui is set up now so we can simply leave and the launchpad will keep us
-        # running until appuifw.app.set_exit() is called (see: RootWindow.close)
 
     def start_plugins(self):
         plugins_path = os.path.join(self.path, 'plugins')

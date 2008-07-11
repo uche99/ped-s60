@@ -60,6 +60,7 @@ except ImportError:
     pass
     
 
+# threading.Event alike class built around e32.Ao_lock
 class Event(object):
     def __init__(self):
         self.lock = e32.Ao_lock()
@@ -1528,6 +1529,9 @@ class Settings(SettingsGroup):
         SettingsGroup.__init__(self, title)
         self.filename = filename
         self.window = None
+
+    def set_filename(self, filename):
+        self.filename = filename
 
     def load(self):
         import marshal
