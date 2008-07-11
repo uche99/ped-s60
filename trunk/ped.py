@@ -967,8 +967,8 @@ class PythonFileWindow(TextFileWindow, PythonModifier):
                 indent = ln.index(ln.lstrip()[0])
             except:
                 indent = 0
-            if indent != pos - offset:
-                ui.screen.rootwin.call_after(0.0, self.move_beg_of_line)
+            if indent != pos-offset:
+                ui.schedule(self.move_beg_of_line)
         else:
             return TextFileWindow.key_press(self, key)
         return False
@@ -1375,7 +1375,10 @@ class PythonShellWindow(IOWindow, PythonModifier):
                     return False
             try:
                 statement = self.history[self.history_ptr]
-                self.body.delete(self.prompt_pos)
+                try:
+                    self.body.delete(self.prompt_pos)
+                except SymbianError:
+                    pass
                 self.body.set_pos(self.prompt_pos)
                 self.write('\n'.join(statement))
                 ui.schedule(self.body.set_pos, self.body.get_pos())
