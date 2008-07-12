@@ -1186,28 +1186,39 @@ class FileBrowserWindow(Window):
 
     def info_click(self):
         item = self.lst[self.body.current()]
-        if item[0] not in [self.FILE, self.DIR]:
+        if item[0] not in [self.DRIVE, self.FILE, self.DIR] or item[3] == 'recents':
             return
-        import time
-        stat = os.stat(os.path.join(self.path, item[3]))
-        if item[0] == self.FILE:
-            n = stat.st_size
-            text = '%d bytes' % n
+        if item[0] == self.DRIVE:
+            from sysinfo import free_drivespace
+            n = free_drivespace()[item[2]]
+            text = u'%d B' % n
             if n > 1024:
                 n /= 1024.0
-                text = '%.1f KB' % n
+                text = u'%.1f KB' % n
             if n > 1024:
                 n /= 1024.0
-                text = '%.1f MB' % n
-            text += '\n'
+                text = u'%.1f MB' % n
+            text = _('Free: %s') % text
         else:
-            text = ''
-        text += time.strftime('%d.%m.%Y %H:%M:%S', time.localtime(stat.st_mtime))
+            import time
+            stat = os.stat(os.path.join(self.path, item[3]))
+            if item[0] == self.FILE:
+                n = stat.st_size
+                text = u'%d B' % n
+                if n > 1024:
+                    n /= 1024.0
+                    text = u'%.1f KB' % n
+                if n > 1024:
+                    n /= 1024.0
+                    text = u'%.1f MB' % n
+                text += u'\n'
+            else:
+                text = u''
+            text += time.strftime('%d.%m.%Y %H:%M:%S', time.localtime(stat.st_mtime))
         try:
-            self.popup = InfoPopup()
-            self.popup.show(unicode(text))
+            infopopup.show(text)
         except NameError:
-            note(unicode(text))
+            note(text)
 
 
 class Setting(object):
