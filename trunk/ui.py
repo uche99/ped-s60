@@ -405,6 +405,7 @@ class Screen(object):
         self.__control_key_last = None
 
     def __control_key_reset(self, win):
+        # finishes control key processing
         if self.__control_key_timer is not None:
             self.__control_key_timer.cancel()
             self.__control_key_timer = None

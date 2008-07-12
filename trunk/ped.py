@@ -216,7 +216,7 @@ class TextWindow(Window):
         Window.__init__(self, *args, **kwargs)
         self.body = ui.Text()
         self.find_text = u''
-        self.keys += (ui.EKeyEnter, ui.EKeySelect)
+        self.keys += (ui.EKeyEnter, ui.EKeySelect, ui.EKeyHome)
         self.control_keys += (ui.EKey3, ui.EKey6, ui.EKey2, ui.EKey4, ui.EKey7,
                               ui.EKeyLeftArrow, ui.EKeyRightArrow,
                               ui.EKeyUpArrow, ui.EKeyDownArrow, ui.EKeyEdit)
@@ -257,6 +257,11 @@ class TextWindow(Window):
         elif key == ui.EKeyEnter:
             ui.schedule(self.enter_key_press)
             return True
+        elif key == ui.EKeyHome:
+            # keep the behavior of self.move_beg_of_line() if Home key (on an
+            # external keyboard) is pressed
+            self.move_beg_of_line()
+            return False
         return Window.key_press(self, key)
 
     def control_key_press(self, key):
@@ -280,15 +285,15 @@ class TextWindow(Window):
             if item:
                 item.target()
         elif key == ui.EKeyLeftArrow:
-            self.move_beg_of_line(1)
+            self.move_beg_of_line()
             self.reset_control_key()
         elif key == ui.EKeyRightArrow:
-            self.move_end_of_line(-1)
+            self.move_end_of_line()
             self.reset_control_key()
         elif key == ui.EKeyUpArrow:
-            self.move_page_up(1)
+            self.move_page_up()
         elif key == ui.EKeyDownArrow:
-            self.move_page_down(-1)
+            self.move_page_down()
         else:
             return Window.control_key_press(self, key)
         return False
@@ -433,14 +438,23 @@ class TextWindow(Window):
             except IndexError:
                 self.body.set_pos(self.body.len())
 
-    def move_beg_of_line(self, delta=0):
-        self.body.set_pos(self.get_line_from_pos()[1] + delta)
+    def move_beg_of_line(self):
+        # first jump to the beginning of text in a line, then to the first char
+        pos = self.body.get_pos()
+        lnum, offset, ln = self.get_line_from_pos(pos)
+        try:
+            indent = ln.index(ln.lstrip()[0])
+        except:
+            indent = 0
+        if indent == pos - offset:
+            indent = 0
+        ui.schedule(self.body.set_pos, offset + indent)
 
-    def move_end_of_line(self, delta=0):
+    def move_end_of_line(self):
         line = self.get_line_from_pos()
-        self.body.set_pos(line[1] + len(line[2]) + delta)
+        ui.schedule(self.body.set_pos, line[1] + len(line[2]))
 
-    def move_page_up(self, delta=0):
+    def move_page_up(self):
         sett = 'pagesize'
         if self.orientation == ui.oriLandscape:
             sett += 'land'
@@ -449,12 +463,12 @@ class TextWindow(Window):
         else:
             sett += 'norm'
         lines = self.get_lines()
-        i = self.get_line_from_pos(lines=lines)[0] - 1 - app.settings.editor[sett].get() + delta
+        i = self.get_line_from_pos(lines=lines)[0] - 1 - app.settings.editor[sett].get()
         if i < 0:
             i = 0
-        self.body.set_pos(lines[i][1])
+        ui.schedule(self.body.set_pos, lines[i][1])
 
-    def move_page_down(self, delta=0):
+    def move_page_down(self):
         sett = 'pagesize'
         if self.orientation == ui.oriLandscape:
             sett += 'land'
@@ -463,16 +477,16 @@ class TextWindow(Window):
         else:
             sett += 'norm'
         lines = self.get_lines()
-        i = self.get_line_from_pos(lines=lines)[0] - 1 + app.settings.editor[sett].get() + delta
+        i = self.get_line_from_pos(lines=lines)[0] - 1 + app.settings.editor[sett].get()
         if i >= len(lines):
             i = -1
-        self.body.set_pos(lines[i][1])
+        ui.schedule(self.body.set_pos, lines[i][1])
 
     def move_beg_of_document(self):
-        self.body.set_pos(0)
+        ui.schedule(self.body.set_pos, 0)
 
     def move_end_of_document(self):
-        self.body.set_pos(self.body.len())
+        ui.schedule(self.body.set_pos, self.body.len())
 
     def reset_caret(self):
         self.body.set_pos(self.body.get_pos())
@@ -941,7 +955,6 @@ class PythonFileWindow(TextFileWindow, PythonModifier):
     def __init__(self, *args, **kwargs):
         TextFileWindow.__init__(self, *args, **kwargs)
         PythonModifier.__init__(self)
-        self.keys += (ui.EKeyHome,)
         self.control_keys += (ui.EKey1, ui.EKey5, ui.EKeySelect, ui.EKey8)
         self.args = u''
 
@@ -956,22 +969,6 @@ class PythonFileWindow(TextFileWindow, PythonModifier):
     def enter_key_press(self):
         TextFileWindow.enter_key_press(self)
         self.py_insert_indent()
-
-    def key_press(self, key):
-        if key == ui.EKeyHome:
-            # emulate the behavior of our move_beg_of_line() if Home key on an
-            # external keyboard is pressed
-            pos = self.body.get_pos()
-            lnum, offset, ln = self.get_line_from_pos(pos)
-            try:
-                indent = ln.index(ln.lstrip()[0])
-            except:
-                indent = 0
-            if indent != pos-offset:
-                ui.schedule(self.move_beg_of_line)
-        else:
-            return TextFileWindow.key_press(self, key)
-        return False
 
     def control_key_press(self, key):
         if key == ui.EKey1:
@@ -988,18 +985,6 @@ class PythonFileWindow(TextFileWindow, PythonModifier):
         else:
             return TextFileWindow.control_key_press(self, key)
         return False
-
-    def move_beg_of_line(self, delta=0):
-        # overridden method to first jump to the beginning of text in a line
-        pos = self.body.get_pos()
-        lnum, offset, ln = self.get_line_from_pos(pos)
-        try:
-            indent = ln.index(ln.lstrip()[0])
-        except:
-            indent = 0
-        if indent == pos - offset:
-            indent = 0
-        self.body.set_pos(offset + indent + delta)
 
     def run_click(self):
         TextFileWindow.store_session()
@@ -1308,8 +1293,7 @@ class PythonShellWindow(IOWindow, PythonModifier):
         IOWindow.__init__(self, *args, **kwargs)
         PythonModifier.__init__(self)
         self.control_keys += (ui.EKeyUpArrow, ui.EKeyDownArrow,
-                              ui.EKeyBackspace, ui.EKeyLeftArrow,
-                              ui.EKey5, ui.EKeySelect)
+                              ui.EKeyBackspace, ui.EKey5, ui.EKeySelect)
         self.old_stdio = sys.stdin, sys.stdout, sys.stderr
         sys.stdin = sys.stdout = sys.stderr = self
         self.write('Python %s on %s\n' \
@@ -1385,12 +1369,6 @@ class PythonShellWindow(IOWindow, PythonModifier):
             except IndexError:
                 self.body.delete(self.prompt_pos)
                 ui.schedule(self.body.set_pos, self.prompt_pos)
-        elif key == ui.EKeyLeftArrow:
-            ln, pos, line = self.get_line_from_pos()
-            if pos <= self.prompt_pos <= pos + len(line):
-                pos = self.prompt_pos
-            ui.schedule(self.body.set_pos, pos)
-            self.reset_control_key()
         elif key == ui.EKeyBackspace:
             if not self.is_locked():
                 pos = self.body.get_pos()
@@ -1536,6 +1514,14 @@ class PythonShellWindow(IOWindow, PythonModifier):
         if ui.query(_('Clear the buffer?'), 'query'):
             self.body.clear()
             self.prompt()
+
+    def move_beg_of_line(self):
+        ln, pos, line = self.get_line_from_pos()
+        # if we are in the prompt line, move to the start of prompt
+        if pos <= self.prompt_pos <= pos + len(line):
+            ui.schedule(self.body.set_pos, self.prompt_pos)
+        else:
+            IOWindow.move_beg_of_line(self)
 
 
 class HistoryWindow(Window):
