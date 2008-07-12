@@ -1322,6 +1322,7 @@ class PythonShellWindow(IOWindow, PythonModifier):
         self.init_console()
         halfbar = '=' * 5
         self.move_end_of_document()
+        e32.ao_yield()
         self.write(halfbar + ' RESTART ' + halfbar + '\n')
         self.prompt()
 
