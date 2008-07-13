@@ -35,7 +35,7 @@
 
 
 # application version
-__version__ = '2.30.3 beta'
+__version__ = '2.30.4 beta'
 
 
 import sys
@@ -2058,7 +2058,7 @@ class Application(object):
                 except:
                     from traceback import print_exc
                     print_exc()
-                    ui.note(_('Starting %s plugin failed, skipping') % repr(name.decode('utf8')), 'error')
+                    ui.note(_('Starting %s plugin failed, skipping') % name.decode('utf8'), 'error')
                 sys.argv, sys.path = mysys
             if reduce(lambda x, y: x+y, [len(cat) for cname, cat in self.settings.all()]) != slen:
                 # plugins have added/removed the settings;
