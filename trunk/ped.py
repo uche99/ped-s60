@@ -647,7 +647,7 @@ class TextFileWindow(TextWindow):
             f.close()
             return True
         except IOError:
-            ui.note(_('Cannot save file!'), 'error')
+            ui.note(_('Cannot save file'), 'error')
             return False
 
     def autosave(self):
@@ -1486,7 +1486,7 @@ class PythonShellWindow(IOWindow, PythonModifier):
 
     def is_busy(self):
         if self.is_locked():
-            ui.note(_('%s is busy!') % self.title, 'error')
+            ui.note(_('%s is busy') % self.title, 'error')
             return True
         return False
 
@@ -1517,7 +1517,7 @@ class PythonShellWindow(IOWindow, PythonModifier):
             f.write(self.body.get().replace(u'\u2029', u'\r\n').encode(app.settings.main.encoding))
             f.close()
         except IOError:
-            ui.note(_('Cannot export the output!'), 'error')
+            ui.note(_('Cannot export the output'), 'error')
 
     def clear_click(self):
         if ui.query(_('Clear the buffer?'), 'query'):
@@ -1754,7 +1754,7 @@ class PluginsWindow(Window):
         import zipfile
         # plugin must be a zip file
         if not zipfile.is_zipfile(filename):
-            ui.note(_('Not a plugin file!'), 'error')
+            ui.note(_('Not a plugin file'), 'error')
             return
         z = zipfile.ZipFile(filename)
         lst = [x.lower() for x in z.namelist()]
@@ -2015,7 +2015,7 @@ class Application(object):
         try:
             TextFileWindow.session.save()
         except IOError:
-            ui.note(_('Cannot update session file!'), 'error')
+            ui.note(_('Cannot update session file'), 'error')
 
     def start_plugins(self):
         plugins_path = os.path.join(self.path, 'plugins')
@@ -2096,7 +2096,7 @@ class Application(object):
     def apply_settings(self):
         TextWindow.update_settings()
         if self.language != self.settings.main.language.encode('utf8'):
-            ui.note(_('Restart Ped for the changes to take effect.'))
+            ui.note(_('Restart Ped for the changes to take effect'))
 
     def plugins_click(self):
         if self.plugins_win and self.plugins_win.is_alive():
@@ -2126,7 +2126,7 @@ class Application(object):
             self.help_win.body.set_pos(0)
             self.help_win.focus = True
         except IOError:
-            ui.note(_('Cannot load help file!'), 'error')
+            ui.note(_('Cannot load help file'), 'error')
             bwin.close()
 
     def new_click(self):
@@ -2139,7 +2139,7 @@ class Application(object):
 
     def open_click(self):
         if self.browser_win:
-            ui.note(_('File browser already in use!'), 'error')
+            ui.note(_('File browser already in use'), 'error')
             return
         self.browser_win = ui.screen.create_window(ui.FileBrowserWindow,
                 title=_('Open file'))
@@ -2167,13 +2167,13 @@ class Application(object):
             win.focus = True
         except IOError:
             win = None
-            ui.note(_('Cannot load %s file!') % os.path.split(path)[1], 'error')
+            ui.note(_('Cannot load %s file') % os.path.split(path)[1], 'error')
             wwin.close()
         return win
 
     def runscript_click(self):
         if self.browser_win:
-            ui.note(_('File browser already in use!'), 'error')
+            ui.note(_('File browser already in use'), 'error')
             return
         self.browser_win = ui.screen.create_window(ui.FileBrowserWindow,
                 title=_('Run script'))
