@@ -1444,9 +1444,13 @@ class ShortkeySettingWindow(Window):
     def __init__(self, *args, **kwargs):
         Window.__init__(self, *args, **kwargs)
         self.body = Text()
-        if 'text' not in kwargs:
-            kwargs['text'] = u'%s\n' % _('Press a new shortkey or select Exit to cancel this dialog.')
-        self.body.add(unicode(kwargs['text']))
+        self.value = kwargs.get('value', None)
+        if 'text' in kwargs:
+            self.body.add(unicode(kwargs['text']))
+        else:
+            self.body.add(u'%s\n\n%s\n' % \
+                (_('Press a new shortkey (green key followed by a 0-9, * or # key) or close this window to cancel.'),
+                _('Current setting: %s') % self.value))
         self.menu.append(MenuItem(_('Exit'), target=self.close))
         self.control_keys = (EKey0, EKey1, EKey2, EKey3, EKey4, EKey5, EKey6, EKey7, EKey8,
             EKey9, EKey0, EKeyStar, EKeyHash)
@@ -1461,7 +1465,9 @@ class ShortkeySetting(Setting):
         Setting.__init__(self, title, value)
 
     def edit(self):
-        key = screen.create_window(ShortkeySettingWindow, title=self.title).modal()
+        key = screen.create_window(ShortkeySettingWindow,
+            title=self.title,
+            value=self).modal()
         if key is not None:
             self.value = key
             return True
