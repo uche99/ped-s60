@@ -260,7 +260,7 @@ class TextWindow(Window):
         elif key == ui.EKeyHome:
             # keep the behavior of self.move_beg_of_line() if Home key (on an
             # external keyboard) is pressed
-            self.move_beg_of_line()
+            self.move_beg_of_line(immediate=False)
             return False
         return Window.key_press(self, key)
 
@@ -285,15 +285,15 @@ class TextWindow(Window):
             if item:
                 item.target()
         elif key == ui.EKeyLeftArrow:
-            self.move_beg_of_line()
+            self.move_beg_of_line(immediate=False)
             self.reset_control_key()
         elif key == ui.EKeyRightArrow:
-            self.move_end_of_line()
+            self.move_end_of_line(immediate=False)
             self.reset_control_key()
         elif key == ui.EKeyUpArrow:
-            self.move_page_up()
+            self.move_page_up(immediate=False)
         elif key == ui.EKeyDownArrow:
-            self.move_page_down()
+            self.move_page_down(immediate=False)
         else:
             return Window.control_key_press(self, key)
         return False
@@ -438,23 +438,32 @@ class TextWindow(Window):
             except IndexError:
                 self.body.set_pos(self.body.len())
 
-    def move_beg_of_line(self):
-        # first jump to the beginning of text in a line, then to the first char
+    def set_pos(self, pos, immediate=True):
+        if immediate:
+            self.body.set_pos(pos)
+        else:
+            ui.schedule(self.body.set_pos, pos)
+
+    def move_beg_of_line(self, immediate=True, force=False):
         pos = self.body.get_pos()
         lnum, offset, ln = self.get_line_from_pos(pos)
-        try:
-            indent = ln.index(ln.lstrip()[0])
-        except:
+        if force:
             indent = 0
-        if indent == pos - offset:
-            indent = 0
-        ui.schedule(self.body.set_pos, offset + indent)
+        else:
+            # first jump to the beginning of text in a line, then to the first char
+            try:
+                indent = ln.index(ln.lstrip()[0])
+            except:
+                indent = 0
+            if indent == pos - offset:
+                indent = 0
+        self.set_pos(offset + indent, immediate)
 
-    def move_end_of_line(self):
+    def move_end_of_line(self, immediate=True):
         line = self.get_line_from_pos()
-        ui.schedule(self.body.set_pos, line[1] + len(line[2]))
+        self.set_pos(line[1] + len(line[2]), immediate)
 
-    def move_page_up(self):
+    def move_page_up(self, immediate=True):
         sett = 'pagesize'
         if self.orientation == ui.oriLandscape:
             sett += 'land'
@@ -466,9 +475,9 @@ class TextWindow(Window):
         i = self.get_line_from_pos(lines=lines)[0] - 1 - app.settings.editor[sett].get()
         if i < 0:
             i = 0
-        ui.schedule(self.body.set_pos, lines[i][1])
+        self.set_pos(lines[i][1], immediate)
 
-    def move_page_down(self):
+    def move_page_down(self, immediate=True):
         sett = 'pagesize'
         if self.orientation == ui.oriLandscape:
             sett += 'land'
@@ -480,13 +489,13 @@ class TextWindow(Window):
         i = self.get_line_from_pos(lines=lines)[0] - 1 + app.settings.editor[sett].get()
         if i >= len(lines):
             i = -1
-        ui.schedule(self.body.set_pos, lines[i][1])
+        self.set_pos(lines[i][1], immediate)
 
-    def move_beg_of_document(self):
-        ui.schedule(self.body.set_pos, 0)
+    def move_beg_of_document(self, immediate=True):
+        self.set_pos(0, immediate)
 
-    def move_end_of_document(self):
-        ui.schedule(self.body.set_pos, self.body.len())
+    def move_end_of_document(self, immediate=True):
+        self.set_pos(self.body.len(), immediate)
 
     def reset_caret(self):
         self.body.set_pos(self.body.get_pos())
@@ -1322,7 +1331,6 @@ class PythonShellWindow(IOWindow, PythonModifier):
         self.init_console()
         halfbar = '=' * 5
         self.move_end_of_document()
-        e32.ao_yield()
         self.write(halfbar + ' RESTART ' + halfbar + '\n')
         self.prompt()
 
@@ -1516,13 +1524,13 @@ class PythonShellWindow(IOWindow, PythonModifier):
             self.body.clear()
             self.prompt()
 
-    def move_beg_of_line(self):
+    def move_beg_of_line(self, immediate=True, force=False):
         ln, pos, line = self.get_line_from_pos()
         # if we are in the prompt line, move to the start of prompt
         if pos <= self.prompt_pos <= pos + len(line):
-            ui.schedule(self.body.set_pos, self.prompt_pos)
+            self.set_pos(self.prompt_pos, immediate)
         else:
-            IOWindow.move_beg_of_line(self)
+            IOWindow.move_beg_of_line(self, immediate, force)
 
 
 class HistoryWindow(Window):
@@ -1664,19 +1672,27 @@ class PluginsWindow(Window):
                 f = file(os.path.join(path, 'manifest.txt'))
                 plugins.append((path, name, parse_manifest(f.read().decode('utf8'))))
                 f.close()
-        plugins.sort(lambda a, b: -(a[1]['name'].lower() < b[1]['name'].lower()))
         lst = []
-        started = list(app.started_plugins)
+        started = app.started_plugins.copy()
         for path, name, manifest in plugins:
-            if name in started:
-                started.remove(name)
+            if name in started and \
+                    started[name] in (None, (manifest['name'], manifest['version'])):
+                app.started_plugins[name] = (manifest['name'], manifest['version'])
+                del started[name]
                 descr = _('Running.')
             else:
+                # freshly installed, not yet in app.started_plugins
                 descr = _('Installed. Restart Ped to run.')
-            lst.append((u'%s %s' % (manifest['name'], manifest['version']), unicode(descr)))
-        for name in started:
-            lst.append((unicode(name), _('Uninstalled. Restart to stop.')))
+            lst.append((u'%s %s' % (manifest['name'], manifest['version']), descr))
+        for name, info in started.items():
+            if info is None:
+                info = (name.decode('utf8'), u'')
+            lst.append((u'%s %s' % info, _('Uninstalled. Restart to stop.')))
+            plugins.append(('', name, {'name': info[0], 'version': info[1]}))
         if plugins:
+            plugins.sort(lambda a, b: \
+                -(a[2]['name'].lower()+a[2]['version'] < \
+                b[2]['name'].lower()+b[2]['version']))
             self.menu = self.menu_plugins
             self.popup_menu = self.popup_menu_plugins
         else:
@@ -1695,8 +1711,10 @@ class PluginsWindow(Window):
     def help_click(self):
         try:
             path, name, manifest = self.plugins[self.body.current()]
+            if not path:
+                raise IndexError
         except IndexError:
-            ui.note(_('Not available!'), 'error')
+            ui.note(_('Not available'))
             return
         bwin = ui.screen.create_blank_window(_('Please wait...'))
         path = os.path.join(path, 'help')
@@ -1711,21 +1729,26 @@ class PluginsWindow(Window):
             win.body.set_pos(0)
             win.focus = True
         except IOError:
-            ui.note(_('Cannot load help file!'), 'error')
+            ui.note(_('Cannot load help file'))
             bwin.close()
 
     def install_click(self):
-        win = ui.screen.create_window(ui.FileBrowserWindow, title=_('Install plugin'))
+        win = ui.screen.create_window(ui.FileBrowserWindow,
+            title=_('Install plugin'),
+            filter_ext=('.zip',))
         path = win.modal(self)
         if path:
             self.install(path)
 
     def uninstall_click(self):
         try:
-            self.uninstall(self.plugins[self.body.current()][0])
+            path = self.plugins[self.body.current()][0]
+            if not path:
+                raise IndexError
         except IndexError:
-            ui.note(_('Not available!'), 'error')
-            return
+            ui.note(_('Not available'))
+        else:
+            self.uninstall(path)
 
     def install(self, filename):
         import zipfile
@@ -1737,22 +1760,23 @@ class PluginsWindow(Window):
         lst = [x.lower() for x in z.namelist()]
         # plugin must contain the manifest and default python files
         if 'manifest.txt' not in lst or ('default.py' not in lst and 'default.pyc' not in lst):
-            ui.note(_('Not a plugin file!'), 'error')
+            ui.note(_('Not a plugin file'), 'error')
             return
         # parse manifest and check mandatory fields
         dct = dict([(x.lower(), x) for x in z.namelist()])
         manifest = parse_manifest(z.read(dct['manifest.txt']).decode('utf8'))
         for field in ('folder', 'name', 'version', 'ped-version-min', 'ped-version-max'):
             if field not in manifest:
-                ui.note(_('%s field missing from manifest!') % field.capitalize())
+                ui.note(_('%s field missing from manifest') % field.capitalize())
                 return
         if not ui.query(_('Install\n%s %s?') % (manifest['name'], manifest['version']), 'query'):
             return
-        if __version__ < manifest['ped-version-min']:
-            ui.note(_('Requires Ped in at least version %s! Your is %s.') % (manifest['ped-version-min'], __version__), 'error')
+        pedver = __version__.split()[0]
+        if pedver < manifest['ped-version-min']:
+            ui.note(_('Requires Ped in at least version %s. Your is %s.') % (manifest['ped-version-min'], pedver), 'error')
             return
-        if __version__ > manifest['ped-version-max']:
-            if not ui.query(_('Supports Ped up to version %s. Your is %s. Continue?') % (manifest['ped-version-max'], __version__), 'query'):
+        if pedver > manifest['ped-version-max']:
+            if not ui.query(_('Supports Ped up to version %s. Your is %s. Continue?') % (manifest['ped-version-max'], pedver), 'query'):
                 return
         # create plugins directory if needed
         if not os.path.exists(self.plugins_path):
@@ -1777,15 +1801,16 @@ class PluginsWindow(Window):
                 fh.write(z.read(f.filename))
                 fh.close()
         z.close()
-        ui.note(_('%s %s installed.') % (manifest['name'], manifest['version']), 'conf')
-        ui.note(_('Restart Ped for the changes to take effect.'))
         self.update()
+        ui.note(_('%s %s installed') % (manifest['name'], manifest['version']), 'conf')
+        ui.note(_('Restart Ped for the changes to take effect'))
 
     def uninstall(self, path, quiet=False):
         fh = file(os.path.join(path, 'manifest.txt'))
         manifest = parse_manifest(fh.read())
         fh.close()
-        if not quiet and not ui.query(_('Uninstall\n%s %s?') % (manifest['name'], manifest['version']), 'query'):
+        if not quiet and not ui.query(_('Uninstall\n%s %s?') % (manifest['name'],
+                manifest['version']), 'query'):
             return
         def deldir(path):
             for name in os.listdir(path):
@@ -1793,13 +1818,19 @@ class PluginsWindow(Window):
                 if os.path.isdir(filename):
                     deldir(filename)
                 else:
-                    os.remove(filename)
-            os.rmdir(path)
+                    try:
+                        os.remove(filename)
+                    except OSError:
+                        pass
+            try:
+                os.rmdir(path)
+            except OSError:
+                pass
         deldir(path)
-        if not quiet:
-            ui.note(_('%s %s uninstalled.') % (manifest['name'], manifest['version']), 'conf')
-            ui.note(_('Restart Ped for the changes to take effect.'))
         self.update()
+        if not quiet:
+            ui.note(_('%s %s uninstalled') % (manifest['name'], manifest['version']), 'conf')
+            ui.note(_('Restart Ped for the changes to take effect'))
 
 
 class Application(object):
@@ -1823,17 +1854,11 @@ class Application(object):
         settings.load_if_available()
         self.language = settings.main.language.encode('utf8')
         if self.language != 'English':
-            try:
-                # load the ped language file
-                translator.load(os.path.join(path, self.language))
-            except IOError:
-                pass
-            try:
-                # load the ui language file
-                path = os.path.join(self.path, 'lang\\ui')
-                ui.translator.load(os.path.join(path, self.language))
-            except IOError:
-                pass
+            # load the ped language file
+            translator.load_if_available(os.path.join(path, self.language))
+            # load the ui language file
+            path = os.path.join(self.path, 'lang\\ui')
+            ui.translator.load_if_available(os.path.join(path, self.language))
 
         # setup settings
         allfonts = ui.available_text_fonts()
@@ -1888,7 +1913,7 @@ class Application(object):
         # properties initialization
         self.browser_win = self.help_win = self.plugins_win = None
         self.unnamed_count = 1
-        self.started_plugins = []
+        self.started_plugins = {}
         
         # override __import__ to save and reload currently edited modules
         def ped_import(name, globals=None, locals=None, fromlist=None):
@@ -1994,16 +2019,25 @@ class Application(object):
 
     def start_plugins(self):
         plugins_path = os.path.join(self.path, 'plugins')
-        self.started_plugins = []
+        self.started_plugins = {}
         if os.path.exists(plugins_path):
-            slen = len(self.settings)
+            slen = reduce(lambda x, y: x+y, [len(cat) for cname, cat in self.settings.all()])
             for name in os.listdir(plugins_path):
                 path = os.path.join(plugins_path, name)
-                t = os.path.join(path, 'default.py')
-                if os.path.exists(t):
-                    filename = t
+                t1 = os.path.join(path, 'default.py')
+                t2 = os.path.join(path, 'default.pyc')
+                try:
+                    m1 = os.path.getmtime(t1)
+                except OSError:
+                    m1 = 0.0
+                try:
+                    m2 = os.path.getmtime(t2)
+                except OSError:
+                    m2 = 0.0
+                if m2 > m1:
+                    filename = t2
                 else:
-                    filename = os.path.join(path, 'default.pyc')
+                    filename = t1
                 # list() will make copies so we will be able to restore these later
                 mysys = list(sys.argv), list(sys.path)
                 sys.path.insert(0, os.path.split(filename)[0])
@@ -2014,13 +2048,19 @@ class Application(object):
                     ns.update(__main__.__dict__)
                     ns.update(__main__.__builtins__.__dict__)
                     ns['__name__'] = '__main__'
+                    ns['__file__'] = filename
+                    ns['__plugin__'] = name
+                    ns['_'] = translator = ui.Translator()
+                    ns['repattr'] = repattr
                     execfile(filename, ns)
-                    self.started_plugins.append(name)
+                    translator.load_if_available(os.path.join(path, 'lang\\' + self.language))
+                    self.started_plugins[name] = None
                 except:
                     from traceback import print_exc
                     print_exc()
+                    ui.note(_('Starting %s plugin failed, skipping') % repr(name.decode('utf8')), 'error')
                 sys.argv, sys.path = mysys
-            if len(self.settings) != slen:
+            if reduce(lambda x, y: x+y, [len(cat) for cname, cat in self.settings.all()]) != slen:
                 # plugins have added/removed the settings;
                 # reload so the new settings are loaded too
                 self.settings.load_if_available()
@@ -2246,12 +2286,12 @@ def parse_manifest(manifest):
             ln = lines.pop()
         except IndexError:
             break
-        p = ln.find(':')
+        p = ln.find(u':')
         assert p > 0, 'mangled manifest file'
         name = ln[:p].strip().lower()
         value = []
         vln = ln[p+1:].strip()
-        while vln.endswith('\\'):
+        while vln.endswith(u'\\'):
             value.append(vln[:-1].strip())
             try:
                 ln = lines.pop()
@@ -2260,7 +2300,7 @@ def parse_manifest(manifest):
             vln = ln.strip()
         value.append(vln)
         assert name not in fields, 'manifest field defined twice'
-        fields[name] = '\n'.join(value)
+        fields[name] = u'\n'.join(value)
     return fields
 
 

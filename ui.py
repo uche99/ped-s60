@@ -818,6 +818,7 @@ class FileBrowserWindow(Window):
             kwargs['title'] = _('File browser')
         Window.__init__(self, *args, **kwargs)
         self.mode = kwargs.get('mode', fbmOpen)
+        self.filter_ext = kwargs.get('filter_ext', ())
         self.path, self.name = os.path.split(kwargs.get('path', ''))
         # gtitle is the global title, 'File browser' or set by user
         # ctitle is the current title, together with filter they make the window title
@@ -987,24 +988,26 @@ class FileBrowserWindow(Window):
     def set_list(self, active=None, dofilter=False):
         if active is None:
             active = self.body.current()
+        lst = self.lstall
+        if self.filter_ext:
+            lst = [x for x in lst if x[0] != self.FILE or \
+                os.path.splitext(x[3])[-1].lower() in self.filter_ext]
         if dofilter:
             if self.filterstr:
-                self.lst = [x for x in self.lstall if x[0] == self.INFO or unicode(x[2]).lower().find(self.filterstr) >= 0]
-                if not self.lst:
-                    self.lst.append((self.INFO, self.icons['info'], _('(no match)'), None))
-                try:
-                    active = self.lst.index(self.lstall[active])
-                except ValueError:
-                    active = 0
+                lst = [x for x in lst if x[0] == self.INFO or \
+                    unicode(x[2]).lower().find(self.filterstr) >= 0]
+                if not lst:
+                    lst.append((self.INFO, self.icons['info'], _('(no match)'), None))
                 self.title = '%s | %s' % (self.filterstr, self.ctitle)
             else:
                 self.lst = self.lstall
                 self.title = self.ctitle
-        if active < 0:
+        try:
+            active = lst.index(self.lstall[active])
+        except ValueError:
             active = 0
-        elif active >= len(self.lst):
-            active = len(self.lst) - 1
-        self.body.set_list([(unicode(x[2]), x[1]) for x in self.lst], active)
+        self.body.set_list([(unicode(x[2]), x[1]) for x in lst], active)
+        self.lst = lst
 
     def select_click(self):
         if self.busy:
@@ -1533,6 +1536,9 @@ class SettingsGroup(object):
     def __contains__(self, name):
         return name in self.objs
 
+    def __len__(self):
+        return len(self.objs)
+
 
 class Settings(SettingsGroup):
     def __init__(self, filename, title=None):
@@ -1700,6 +1706,12 @@ class Translator(object):
                         raise TypeError('translation file must contain strings only')
                     self.translations[x.keys()[0]] = dst
         f.close()
+
+    def load_if_available(self, filename):
+        try:
+            self.load(filename)
+        except IOError:
+            pass
 
     def unload(self):
         self.translations = {}
