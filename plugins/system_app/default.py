@@ -15,8 +15,7 @@ import sys, ped, ui
 try:
     from envy import set_app_system
 except ImportError:
-    ui.note(u'%s plugin requires envy module' % __plugin__, 'error')
-    sys.exit()
+    sys.exit('%s plugin requires envy module' % __plugin__)
 
 def apply_settings(self):
     old_apply_settings(self)

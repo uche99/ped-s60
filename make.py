@@ -9,7 +9,7 @@ import sys
 import getopt
 
 # Version (major, minor, build)
-version = (2, 30, 3)
+version = (2, 30, 4)
 version_tail = 'beta'
 
 # full path to python 2.2 binary
