@@ -1166,9 +1166,9 @@ class FileBrowserWindow(Window):
             try:
                 if os.path.exists(dst) and src.lower() != dst.lower():
                     if os.path.isdir(dst):
-                        note(_('Already exists as a directory!'), 'error')
+                        note(_('Already exists as a directory'), 'error')
                         continue
-                    if not query(_('Already exists!\nOverwrite?'), 'query'):
+                    if not query(_('Already exists.\nOverwrite?'), 'query'):
                         continue
                     os.remove(dst)
                 os.rename(src, dst)
