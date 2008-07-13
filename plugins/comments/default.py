@@ -10,18 +10,15 @@
 # Distributed under the new BSD license.
 #
 
-import sys
-import os
-import ped
-import ui
+import sys, e32, ped, ui
 
 # new ped.PythonFileWindow.control_key_press method
 def control_key_press(self, key):
     # check if the configured shortkey was pressed
-    if key == ped.app.settings['ezcomment_key'].get():
+    if key == ped.app.settings.plugins.comments_key:
         # move the cursor to the start of a line
-        self.move_beg_of_line()
-        
+        self.move_beg_of_line(force=True)
+
         # check if there are '#' chars at cursor and remove them
         # or add one if there wren't any
         pos = self.body.get_pos()
@@ -46,25 +43,14 @@ def control_key_press(self, key):
         # we have handled the key
         return True
     else:
-        # let the old method control the key
+        # let the old method control other keys
         return old_control_key_press(self, key)
 
 if __name__ == '__main__':
-    # plugin path
-    path = os.path.split(sys.argv[0])[0]
-
-    # i18n object
-    translator = _ = ui.Translator()
-    if ped.app.language != 'English':
-        try:
-            translator.load(os.path.join(path, 'lang\\' + ped.app.language))
-        except IOError:
-            pass
-
     # patch the ped.PythonFileWindow.control_key_press method
-    old_control_key_press = ped.repattr(ped.PythonFileWindow,
+    old_control_key_press = repattr(ped.PythonFileWindow,
         'control_key_press', control_key_press)
 
-    # add the shortkey configuration to the settings
-    ped.app.settings.add_setting('plugins', 'ezcomment_key',
-        ui.ShortkeySetting(_('EZ-Comment key'), ui.EKey2))
+    # add to settings
+    ped.app.settings.plugins.add('comments_key',
+        ui.ShortkeySetting(_('Comments key'), ui.EKey2))

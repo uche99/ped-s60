@@ -1,0 +1,5 @@
+Folder: system_app
+Name: System App
+Version: 1.00.0
+Ped-Version-Min: 2.30.0
+Ped-Version-Max: 2.30.3
