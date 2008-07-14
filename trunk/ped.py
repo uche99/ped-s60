@@ -1669,9 +1669,7 @@ class PluginsWindow(Window):
         if os.path.exists(self.plugins_path):
             for name in os.listdir(self.plugins_path):
                 path = os.path.join(self.plugins_path, name)
-                f = file(os.path.join(path, 'manifest.txt'))
-                plugins.append((path, name, parse_manifest(f.read().decode('utf8'))))
-                f.close()
+                plugins.append((path, name, Manifest(os.path.join(path, 'manifest.txt'))))
         lst = []
         started = app.started_plugins.copy()
         for path, name, manifest in plugins:
@@ -1764,7 +1762,8 @@ class PluginsWindow(Window):
             return
         # parse manifest and check mandatory fields
         dct = dict([(x.lower(), x) for x in z.namelist()])
-        manifest = parse_manifest(z.read(dct['manifest.txt']).decode('utf8'))
+        manifest = Manifest()
+        manifest.parse(z.read(dct['manifest.txt']))
         for field in ('folder', 'name', 'version', 'ped-version-min', 'ped-version-max'):
             if field not in manifest:
                 ui.note(_('%s field missing from manifest') % field.capitalize())
@@ -1778,14 +1777,14 @@ class PluginsWindow(Window):
         if pedver > manifest['ped-version-max']:
             if not ui.query(_('Supports Ped up to version %s. Your is %s. Continue?') % (manifest['ped-version-max'], pedver), 'query'):
                 return
+            # increase version range to stop Ped from complaining upon startup
+            manifest['ped-version-max'] = pedver
         # create plugins directory if needed
         if not os.path.exists(self.plugins_path):
             os.mkdir(self.plugins_path)
         path = os.path.join(self.plugins_path, manifest['folder'])
         if os.path.exists(path):
-            fh = file(os.path.join(path, 'manifest.txt'))
-            old_manifest = parse_manifest(fh.read())
-            fh.close()
+            old_manifest = Manifest(os.path.join(path, 'manifest.txt'))
             if not ui.query(_('Replace version %s with %s?') % (old_manifest['version'], manifest['version']), 'query'):
                 return
             self.uninstall(path, quiet=True)
@@ -1801,14 +1800,14 @@ class PluginsWindow(Window):
                 fh.write(z.read(f.filename))
                 fh.close()
         z.close()
+        # manifest could be changed so save it
+        manifest.save(os.path.join(path, 'manifest.txt'))
         self.update()
         ui.note(_('%s %s installed') % (manifest['name'], manifest['version']), 'conf')
         ui.note(_('Restart Ped for the changes to take effect'))
 
     def uninstall(self, path, quiet=False):
-        fh = file(os.path.join(path, 'manifest.txt'))
-        manifest = parse_manifest(fh.read())
-        fh.close()
+        manifest = Manifest(os.path.join(path, 'manifest.txt'))
         if not quiet and not ui.query(_('Uninstall\n%s %s?') % (manifest['name'],
                 manifest['version']), 'query'):
             return
@@ -2024,6 +2023,20 @@ class Application(object):
             slen = reduce(lambda x, y: x+y, [len(cat) for cname, cat in self.settings.all()])
             for name in os.listdir(plugins_path):
                 path = os.path.join(plugins_path, name)
+                # load manifest
+                manifest = Manifest(os.path.join(path, 'manifest.txt'))
+                # check version
+                pedver = __version__.split()[0]
+                if manifest['ped-version-min'] > pedver:
+                    ui.note(_('%s plugin requires Ped in at least version %s. Your is %s. Skipping.') % \
+                        (manifest['name'], manifest['ped-version-min'], pedver), 'error')
+                    continue
+                if pedver > manifest['ped-version-max']:
+                    if not ui.query(_('%s plugin supports Ped up to version %s. Your is %s. Run?') % \
+                            (manifest['name'], manifest['ped-version-max'], pedver), 'query'):
+                        continue
+                    manifest['ped-version-max'] = pedver
+                    manifest.save(os.path.join(path, 'manifest.txt'))
                 t1 = os.path.join(path, 'default.py')
                 t2 = os.path.join(path, 'default.pyc')
                 try:
@@ -2275,33 +2288,90 @@ def quote_split(s):
     return ret
 
 
-def parse_manifest(manifest):
-    # parses plugins manifest files and returns
-    # their contents as dictionaries
-    fields = {}
-    lines = manifest.splitlines()
-    lines.reverse()
-    while True:
-        try:
-            ln = lines.pop()
-        except IndexError:
-            break
-        p = ln.find(u':')
-        assert p > 0, 'mangled manifest file'
-        name = ln[:p].strip().lower()
-        value = []
-        vln = ln[p+1:].strip()
-        while vln.endswith(u'\\'):
-            value.append(vln[:-1].strip())
+class Manifest(object):
+    def __init__(self, filename=None):
+        self.fields = {}
+        if filename is not None:
+            self.load(filename)
+        
+    def parse(self, data):
+        lines = data.decode('utf8').splitlines()
+        lines.reverse()
+        self.fields = {}
+        while True:
             try:
                 ln = lines.pop()
             except IndexError:
                 break
-            vln = ln.strip()
-        value.append(vln)
-        assert name not in fields, 'manifest field defined twice'
-        fields[name] = u'\n'.join(value)
-    return fields
+            try:
+                p = ln.index(u':')
+            except ValueError:
+                raise ValueError('mangled manifest file')
+            name = ln[:p].strip().title()
+            value = []
+            vln = ln[p+1:].strip()
+            while vln.endswith(u'\\'):
+                value.append(vln[:-1].strip())
+                try:
+                    ln = lines.pop()
+                except IndexError:
+                    break
+                vln = ln.strip()
+            else:
+                value.append(vln)
+            if name in self.fields:
+                raise ValueError('manifest field defined twice')
+            self.fields[name] = u'\r\n'.join(value)
+    
+    def dump(self):
+        lines = []
+        for name, value in self.fields.items():
+            lines.append(u'%s: %s\r\n' % (name.title(), '\\\r\n'.join(value.split('\n'))))
+        return (''.join(lines)).encode('utf8')
+
+    def load(self, filename):
+        f = open(filename, 'r')
+        try:
+            self.parse(f.read())
+        finally:
+            f.close()
+
+    def save(self, filename):
+        f = open(filename, 'w')
+        try:
+            f.write(self.dump())
+        finally:
+            f.close()
+
+    def get(self, name, default=None):
+        return self.fields.get(name.title(), default)
+
+    def keys(self):
+        return self.fields.keys()
+        
+    def items(self):
+        return self.fields.items()
+        
+    def values(self):
+        return self.fields.values()
+
+    def clear(self):
+        self.fields = {}
+
+    def __getitem__(self, name):
+        return self.fields[name.title()]
+    
+    def __setitem__(self, name, value):
+        self.fields[name.title()] = value
+
+    def __delitem__(self, name):
+        del self.fields[name.title()]
+        
+    def __len__(self):
+        return len(self.fields)
+        
+    def __contains__(self, name):
+        return name.title() in self.fields
 
 
 def repattr(obj, name, value):

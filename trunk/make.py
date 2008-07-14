@@ -57,12 +57,10 @@ def main():
                            EPOCROOT='')),
         
         'ped.pyo': (['ped.py'],
-            lambda: system('''%s -O compile.py ped.py
-                           copy ped.pyo system\\apps\\ped\\ped.pyc''' % python22)),
+            lambda: system('''%s -O compile.py ped.py''' % python22)),
 
         'ui.pyo': (['ui.py'],
-            lambda: system('''%s -O compile.py ui.py
-                           copy ui.pyo system\\apps\\ped\\ui.pyc''' % python22)),
+            lambda: system('''%s -O compile.py ui.py''' % python22)),
         
         'Ped_%s_2ndEd.sis' % verstr():
             (['ped_2ndEd.pkg', 'default.py', 'ped.pyo', 'ui.pyo', 'ped.aif', 'ped_2ndEd.app',
@@ -89,9 +87,6 @@ def main():
             lambda: None),
     
     }
-
-    # Removes temporary 2nd ed. development files
-    map(os.remove, listfiles('system\\apps\\ped'))
 
     # Parse arguments
     opts, args = getopt.gnu_getopt(sys.argv[1:], 'B')
