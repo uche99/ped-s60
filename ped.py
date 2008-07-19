@@ -352,7 +352,10 @@ class TextWindow(Window):
         lines = []
         pos = 0
         n = 1
-        for line in self.body.get().split(u'\u2029'):
+        lst = self.body.get().splitlines()
+        if not lst:
+            lst.append(u'')
+        for line in lst:
             lines.append((n, pos, line))
             n += 1
             pos += len(line) + 1
@@ -632,7 +635,7 @@ class TextFileWindow(TextWindow):
                     pass
             else:
                 raise UnicodeError
-        return text.replace(u'\r\n', u'\u2029').replace(u'\n', u'\u2029'), enc
+        return text.translate({13: None, 10: 0x2029}), enc
 
     def save(self):
         if self.path is None:
@@ -643,7 +646,8 @@ class TextFileWindow(TextWindow):
             self.autosave_timer.after(autosave, self.autosave)
         try:
             f = file(self.path, 'w')
-            f.write(self.body.get().replace(u'\u2029', u'\r\n').encode(self.encoding))
+            f.write(self.body.get().translate({0x2028: 0x2029, 0xa0: 0x20}).replace(u'\u2029',
+                u'\r\n').encode(self.encoding))
             f.close()
             return True
         except IOError:
@@ -767,7 +771,7 @@ class PythonModifier(object):
         i = pos-1
         # walk back to the start of line
         while i >= 0:
-            if text[i] == u'\u2029':
+            if text[i] in (u'\u2028', u'\u2029'):
                 break
             i -= 1
         i += 1
@@ -1013,7 +1017,8 @@ class PythonFileWindow(TextFileWindow, PythonModifier):
             path = os.path.join(dirpath, self.title.encode('utf8'))
             try:
                 f = file(path, 'w')
-                f.write(self.body.get().replace(u'\u2029', u'\r\n').encode(self.encoding))
+                f.write(self.body.get().translate({0x2028: 0x2029, 0xa0: 0x20}).replace(u'\u2029',
+                    u'\r\n').encode(self.encoding))
                 f.close()
             except IOError, (errno, errstr):
                 ui.note(unicode(errstr), 'error')
@@ -1267,7 +1272,10 @@ class IOWindow(TextWindow):
         self.event = None
         if self.input_aborted:
             raise EOFError
-        text = self.body.get(input_pos).split(u'\u2029')[0].encode('latin-1', 'replace') + '\n'
+        lst = self.body.get(input_pos).splitlines()
+        if not lst:
+            lst.append(u'')
+        text = lst[0].encode('latin-1', 'replace') + '\n'
         self.body.set_pos(self.body.len())
         if size and len(text) > size:
             text = text[:size]
@@ -1426,8 +1434,8 @@ class PythonShellWindow(IOWindow, PythonModifier):
             return
         pos = self.body.get_pos()
         # remove new line character
-        if pos > 0 and self.body.get(pos - 1, 1) == u'\u2029':
-            self.body.delete(pos - 1, 1)
+        if pos > 0 and self.body.get(pos-1, 1) in (u'\u2028', u'\u2029'):
+            self.body.delete(pos-1, 1)
             pos -= 1
         if pos < self.prompt_pos:
             # cursor was moved before the statement start
@@ -1445,14 +1453,16 @@ class PythonShellWindow(IOWindow, PythonModifier):
                 pass
             self.write(line)
             return
-        if self.body.get(pos).find(u'\u2029') >= 0:
+        if len(self.body.get(pos).splitlines()) > 1:
             # cursor was moved back in an multiline statement
             self.write('\n')
             self.py_insert_indent()
             return
         # cursor at the last statement line, statement execution follows
         self.body.set_pos(self.body.len())
-        statement = self.body.get(self.prompt_pos).split(u'\u2029')
+        statement = self.body.get(self.prompt_pos).translate({0xa0: 0x20}).splitlines()
+        if not statement:
+            statement.append(u'')
         self.write('\n')
         # remove empty lines so they don't break the statement
         statement = [x for x in statement[:-1] if x.strip()] + statement[-1:]
@@ -1514,7 +1524,8 @@ class PythonShellWindow(IOWindow, PythonModifier):
             return
         try:
             f = file(path, 'w')
-            f.write(self.body.get().replace(u'\u2029', u'\r\n').encode(app.settings.main.encoding))
+            f.write(self.body.get().translate({0x2028: 0x2029, 0xa0: 0x20}).replace(u'\u2029',
+                u'\r\n').encode(app.settings.main.encoding))
             f.close()
         except IOError:
             ui.note(_('Cannot export the output'), 'error')
@@ -1571,7 +1582,7 @@ class HelpWindow(TextWindow):
             f = file(kwargs['path'], 'r')
             text = f.read().decode('utf8')
             f.close()
-        self.body.set(text.replace(u'\r\n', u'\u2029').replace(u'\n', u'\u2029'))
+        self.body.set(text)
         self.body.set_pos(0)
 
     def init_menu(self, menu):
