@@ -1505,6 +1505,11 @@ class SettingsGroup(object):
         else:
             raise TypeError('\'obj\' must be a Setting object')
 
+    def remove(self, name):
+        # will raise a ValueError if name do not exists
+        self.order.remove(name)
+        del self.objs[name]
+
     def clear(self):
         self.objs.clear()
         self.order = []
