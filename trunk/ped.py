@@ -476,11 +476,7 @@ class TextWindow(Window):
             sett += 'full'
         else:
             sett += 'norm'
-        lines = self.get_lines()
-        i = self.get_line_from_pos(lines=lines)[0] - 1 - app.settings.editor[sett].get()
-        if i < 0:
-            i = 0
-        self.set_pos(lines[i][1])
+        self.move_line_up(count=app.settings.editor[sett].get()+shift)
 
     def move_page_down(self):
         sett = 'pagesize'
@@ -490,11 +486,31 @@ class TextWindow(Window):
             sett += 'full'
         else:
             sett += 'norm'
+        self.move_line_down(count=app.settings.editor[sett].get()+shift)
+
+    def move_line_up(self, count=1):
         lines = self.get_lines()
-        i = self.get_line_from_pos(lines=lines)[0] - 1 + app.settings.editor[sett].get()
+        pos = self.body.get_pos()
+        ln, lpos, line = self.get_line_from_pos(lines=lines, pos=pos)
+        i = ln-1-count
+        if i < 0:
+            i = 0
+        lpos = pos-lpos
+        if lpos > len(lines[i][2]):
+            lpos = len(lines[i][2])
+        self.set_pos(lines[i][1]+lpos)
+
+    def move_line_down(self, count=1):
+        lines = self.get_lines()
+        pos = self.body.get_pos()
+        ln, lpos, line = self.get_line_from_pos(lines=lines, pos=pos)
+        i = ln-1+count
         if i >= len(lines):
             i = -1
-        self.set_pos(lines[i][1])
+        lpos = pos-lpos
+        if lpos > len(lines[i][2]):
+            lpos = len(lines[i][2])
+        self.set_pos(lines[i][1]+lpos)
 
     def move_beg_of_document(self):
         self.set_pos(0)

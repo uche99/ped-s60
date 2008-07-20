@@ -421,11 +421,11 @@ class Screen(object):
         self.__control_key_last = None
 
     def __control_key_handler(self, key):
-        win = self.focused_window()
         if self.__control_key_timer is None:
             return
+        win = self.focused_window()
         self.__control_key_timer.cancel()
-        if self.__control_key_last not in [None, key]:
+        if self.__control_key_last not in (None, key):
             self.__control_key_reset(win)
             # if this key should be catched not as a control key,
             # notify the window about it
@@ -438,7 +438,8 @@ class Screen(object):
             # hack to suppress the key press
             def restore():
                 self.__update_fw(_umBody)
-                if hasattr(win._Window__body, 'focus'):
+                if self.__control_key_timer is not None and \
+                        hasattr(win._Window__body, 'focus'):
                     win._Window__body.focus = False
             app.body = Canvas()
             schedule(restore)
