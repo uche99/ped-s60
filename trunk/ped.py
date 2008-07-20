@@ -291,9 +291,11 @@ class TextWindow(Window):
             self.move_end_of_line(immediate=False)
             self.reset_control_key()
         elif key == ui.EKeyUpArrow:
-            self.move_page_up(immediate=False)
+            self.move_page_up()
+            return True
         elif key == ui.EKeyDownArrow:
-            self.move_page_down(immediate=False)
+            self.move_page_down()
+            return True
         else:
             return Window.control_key_press(self, key)
         return False
@@ -466,7 +468,7 @@ class TextWindow(Window):
         line = self.get_line_from_pos()
         self.set_pos(line[1] + len(line[2]), immediate)
 
-    def move_page_up(self, immediate=True):
+    def move_page_up(self):
         sett = 'pagesize'
         if self.orientation == ui.oriLandscape:
             sett += 'land'
@@ -478,9 +480,9 @@ class TextWindow(Window):
         i = self.get_line_from_pos(lines=lines)[0] - 1 - app.settings.editor[sett].get()
         if i < 0:
             i = 0
-        self.set_pos(lines[i][1], immediate)
+        self.set_pos(lines[i][1])
 
-    def move_page_down(self, immediate=True):
+    def move_page_down(self):
         sett = 'pagesize'
         if self.orientation == ui.oriLandscape:
             sett += 'land'
@@ -492,13 +494,13 @@ class TextWindow(Window):
         i = self.get_line_from_pos(lines=lines)[0] - 1 + app.settings.editor[sett].get()
         if i >= len(lines):
             i = -1
-        self.set_pos(lines[i][1], immediate)
+        self.set_pos(lines[i][1])
 
-    def move_beg_of_document(self, immediate=True):
-        self.set_pos(0, immediate)
+    def move_beg_of_document(self):
+        self.set_pos(0)
 
-    def move_end_of_document(self, immediate=True):
-        self.set_pos(self.body.len(), immediate)
+    def move_end_of_document(self):
+        self.set_pos(self.body.len())
 
     def reset_caret(self):
         self.body.set_pos(self.body.get_pos())
@@ -1444,6 +1446,7 @@ class PythonShellWindow(IOWindow, PythonModifier):
                 # prompt was deleted, issue a new one
                 self.write('\n')
                 self.prompt()
+                return
             # recall a line
             line = self.get_line_from_pos(pos=pos)[2]
             try:
