@@ -436,8 +436,12 @@ class Screen(object):
         self.__control_key_timer.after(1.0, lambda: self.__control_key_reset(win))
         if win.control_key_press(key):
             # hack to suppress the key press
+            def restore():
+                self.__update_fw(_umBody)
+                if hasattr(win._Window__body, 'focus'):
+                    win._Window__body.focus = False
             app.body = Canvas()
-            schedule(lambda: self.__update_fw(_umBody))
+            schedule(restore)
         self.__control_key_last = key
 
     def __window_selector(self):
