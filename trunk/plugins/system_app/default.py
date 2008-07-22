@@ -27,5 +27,5 @@ if __name__ == '__main__':
         'apply_settings', apply_settings)
 
     # add to settings
-    ped.app.settings.plugins.add('system_app',
+    ped.app.settings.plugins.append('system_app',
         ui.BoolSetting(_('System application'), False))
