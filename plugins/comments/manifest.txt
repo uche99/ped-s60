@@ -1,5 +1,5 @@
 Folder: comments
 Name: Comments
-Version: 1.00.0
-Ped-Version-Min: 2.30.0
-Ped-Version-Max: 2.30.3
+Version: 1.00.1
+Ped-Version-Min: 2.30.4
+Ped-Version-Max: 2.30.4

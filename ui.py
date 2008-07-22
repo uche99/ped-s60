@@ -113,52 +113,23 @@ class MenuItem(object):
         return '<%s; title=%s>' % (object.__repr__(self)[1:-1], repr(self.title))
 
 
-class Menu(object):
+class Menu(list):
     def __init__(self, title=u'', items=[]):
         if title:
             self.title = title
         else:
             self.title = u''
-        for item in items:
-            assert isinstance(item, MenuItem)
-        self.items = list(items)
+        list.__init__(self, items)
 
     def fw_menu(self):
-        return [x.fw_item() for x in self.items if not x.hidden]
-
-    def append(self, item):
-        assert isinstance(item, MenuItem)
-        self.items.append(item)
-
-    def insert(self, i, item):
-        assert isinstance(item, MenuItem)
-        self.items.insert(i, item)
-
-    def remove(self, item):
-        assert isinstance(item, MenuItem)
-        self.items.remove(item)
-
-    def clear(self):
-        self.items = []
+        return [x.fw_item() for x in self if not x.hidden]
 
     def copy(self):
-        return Menu(self.title, [x.copy() for x in self.items])
-
-    def __getitem__(self, i):
-        return self.items[i]
-
-    def __setitem__(self, i, item):
-        self.items[i] = item
-
-    def __delitem__(self, i):
-        del self.items[i]
-
-    def __len__(self):
-        return len(self.items)
+        return Menu(self.title, [x.copy() for x in self])
 
     def find(self, **kwargs):
         items = []
-        for item in self.items:
+        for item in self:
             for name, val in kwargs.items():
                 if not hasattr(item, name) or getattr(item, name) != val:
                     break
@@ -166,17 +137,15 @@ class Menu(object):
                 items.append(item)
         return tuple(items)
 
-    def index(self, item):
-        return self.items.index(item)
-
     def __repr__(self):
-        return '<%s; items=%s>' % (object.__repr__(self)[1:-1], len(self))
+        return '%s(%s, %s)' % (self.__class__.__name__, repr(self.title),
+            list.__repr__(self))
 
     def __defcompare(a, b):
         return -(unicode(a.title).lower() < unicode(b.title).lower())
 
     def sort(self, compare=__defcompare):
-        self.items.sort(compare)
+        list.sort(self, compare)
 
     def popup(self, full_screen=False, search_field=False):
         if search_field:
@@ -188,7 +157,7 @@ class Menu(object):
         menu = self
         try:
             while True:
-                items = [x for x in menu.items if not x.hidden]
+                items = [x for x in menu if not x.hidden]
                 titles = [unicode(x.title) for x in items]
                 if full_screen:
                     if win:
@@ -212,7 +181,7 @@ class Menu(object):
         return item
 
     def multichoice(self, style='checkbox', search_field=False):
-        items = [x for x in self.items if not x.hidden]
+        items = [x for x in self if not x.hidden]
         titles = [unicode(x.title) for x in items]
         win = screen.focused_window()
         if win:
@@ -436,13 +405,13 @@ class Screen(object):
         self.__control_key_timer.after(1.0, lambda: self.__control_key_reset(win))
         if win.control_key_press(key):
             # hack to suppress the key press
-            def restore():
+            def restore(self, body):
                 self.__update_fw(_umBody)
                 if self.__control_key_timer is not None and \
-                        hasattr(win._Window__body, 'focus'):
-                    win._Window__body.focus = False
+                        hasattr(body, 'focus'):
+                    body.focus = False
             app.body = Canvas()
-            schedule(restore)
+            schedule(lambda self=self, body=win._Window__body: restore(self, body))
         self.__control_key_last = key
 
     def __window_selector(self):
@@ -511,7 +480,7 @@ class Window(object):
         self.modal_result = None
 
     def is_alive(self):
-        return bool(self.__screen is not None)
+        return (self.__screen is not None)
 
     def can_close(self):
         return not self.__overlapped or not self.__overlapped.is_alive()
@@ -858,8 +827,8 @@ class FileBrowserWindow(Window):
             else:
                 self.icons[name] = Icon(path, mbm, mbm+1)
         self.settings = Settings(self.settings_path)
-        self.settings.add('main', SettingsGroup())
-        self.settings.main.add('recents', Setting('Recents', []))
+        self.settings.append('main', SettingsGroup())
+        self.settings.main.append('recents', Setting('Recents', []))
         self.settings.load_if_available()
         self.body = Listbox([(_('(empty)'), self.icons['info'])], self.select_click)
         self.keys += (EKeyLeftArrow, EKeyRightArrow, EKeyStar, EKey0, EKeyHash, EKeyBackspace)
@@ -1246,6 +1215,7 @@ class Setting(object):
         self.title = title
         self.value = value
         self.original = value
+        self.hidden = False
 
     def changed(self):
         return self.original != self.value
@@ -1262,7 +1232,7 @@ class Setting(object):
     def set(self, value):
         self.value = self.original = value
 
-    def edit(self):
+    def edit(self, owner=None):
         return False
 
     def __str__(self):
@@ -1272,11 +1242,11 @@ class Setting(object):
         return unicode(self.value)
 
 
-class TextSetting(Setting):
+class StringSetting(Setting):
     def __init__(self, title, value=u''):
         Setting.__init__(self, title, value)
 
-    def edit(self):
+    def edit(self, owner=None):
         v = query(unicode(self.title), 'text', unicode(self.value))
         if v is not None:
             self.value = v
@@ -1284,7 +1254,7 @@ class TextSetting(Setting):
         return False
 
 
-class NumberSetting(Setting):
+class IntegerSetting(Setting):
     def __init__(self, title, value=0, vmin=None, vmax=None):
         if vmin is not None and vmax is not None and vmin > vmax:
             vmin = vmax
@@ -1296,7 +1266,7 @@ class NumberSetting(Setting):
         self.vmin = vmin
         self.vmax = vmax
 
-    def edit(self):
+    def edit(self, owner=None):
         v = self.value
         while True:
             v = query(unicode(self.title), 'number', v)
@@ -1313,22 +1283,22 @@ class NumberSetting(Setting):
         return True
 
 
-class FloatSetting(NumberSetting):
+class FloatSetting(IntegerSetting):
     def __init__(self, title, value=0.0, vmin=None, vmax=None):
-        NumberSetting.__init__(self, title, float(value), float(vmin), float(vmax))
+        IntegerSetting.__init__(self, title, float(value), float(vmin), float(vmax))
 
-    def edit(self):
+    def edit(self, owner=None):
         v = self.value
         while True:
             v = query(unicode(self.title), 'float', v)
             if v is None:
                 return False
             if self.vmin is not None and v < self.vmin:
-                # we use %s to share a translatable string with NumberSetting
+                # we use %s to share a translatable string with IntegerSetting
                 note(_('Minimal value is %s') % ('%.2f' % self.vmin))
                 continue
             if self.vmax is not None and v > self.vmax:
-                # we use %s to share a translatable string with NumberSetting
+                # we use %s to share a translatable string with IntegerSetting
                 note(_('Maximal value is %s') % ('%.2f' % self.vmax))
                 continue
             self.value = v
@@ -1346,7 +1316,7 @@ class BoolSetting(Setting):
         self.true = true
         self.false = false
 
-    def edit(self):
+    def edit(self, owner=None):
         self.value = not self.value
         return True
 
@@ -1356,13 +1326,13 @@ class BoolSetting(Setting):
         return unicode(self.false)
 
 
-class ComboSetting(Setting):
+class ChoiceSetting(Setting):
     def __init__(self, title, value=None, choices=[], **kwargs):
         Setting.__init__(self, title, value)
-        self.choices = list(choices)
+        self.choices = choices
         self.kwargs = kwargs
 
-    def edit(self):
+    def edit(self, owner=None):
         menu = Menu(self.title)
         for choice in self.choices:
             if choice == self.value:
@@ -1376,13 +1346,13 @@ class ComboSetting(Setting):
         return False
 
 
-class ValueComboSetting(Setting):
+class ChoiceValueSetting(Setting):
     def __init__(self, title, value=None, choices=[], **kwargs):
         Setting.__init__(self, title, value)
-        self.choices = list(choices)
+        self.choices = choices
         self.kwargs = kwargs
 
-    def edit(self):
+    def edit(self, owner=None):
         menu = Menu(self.title)
         for choice, value in self.choices:
             if value == self.value:
@@ -1412,7 +1382,7 @@ class TimeSetting(Setting):
     def __init__(self, title, value=0.0):
         Setting.__init__(self, title, value)
 
-    def edit(self):
+    def edit(self, owner=None):
         v = query(unicode(self.title), 'time', self.value)
         if v is not None:
             self.value = v
@@ -1432,7 +1402,7 @@ class DateSetting(Setting):
     def __init__(self, title, value=0.0):
         Setting.__init__(self, title, value)
 
-    def edit(self):
+    def edit(self, owner=None):
         v = query(unicode(self.title), 'date', self.value)
         if v is not None:
             # the value returned by date query seems to always
@@ -1456,6 +1426,146 @@ class DateSetting(Setting):
         from time import strftime, localtime
         return unicode(strftime('%d.%m.%Y', localtime(self.value)))
 
+
+class GroupSettingWindow(Window):
+    def __init__(self, *args, **kwargs):
+        Window.__init__(self, *args, **kwargs)
+        self.setting = kwargs['setting']
+        self.body = Listbox(self.get_list(), self.change_click)
+        self.menu.append(MenuItem(_('Add'), target=self.add_click))
+        self.menu.append(MenuItem(_('Change'), target=self.change_click))
+        self.menu.append(MenuItem(_('Remove'), target=self.remove_click))
+        self.menu.append(MenuItem(_('Exit'), target=self.close))
+        self.keys += (EKeyBackspace,)
+        self.modal_result = False
+
+    def key_press(self, key):
+        if key == EKeyBackspace:
+            self.remove_click()
+            return False
+        return Window.key_press(self, key)
+
+    def change_click(self):
+        try:
+            setting = self.setting.value.values()[self.body.current()]
+        except IndexError:
+            menu = Menu()
+            menu.append(self.menu[0]) # Add
+            item = menu.popup()
+            if item is not None:
+                item.target()
+            return
+        if setting.edit(self):
+            self.body.set_list(self.get_list(), self.body.current())
+            self.modal_result = True
+
+    def add_click(self):
+        try:
+            name, title = self.setting.get_new_name()
+        except TypeError:
+            return
+        if name:
+            setting = self.setting.get_new(title)
+            if setting is not None:
+                if setting.edit(self):
+                    self.setting.value.append(name, setting)
+                    self.setting.value.sort()
+                    i = self.setting.value.keys().index(name)
+                    self.body.set_list(self.get_list(), i)
+                    self.modal_result = True
+
+    def remove_click(self):
+        try:
+            name, setting = self.setting.value.items()[self.body.current()]
+        except IndexError:
+            note(_('Nothing to remove'))
+            return
+        title = self.setting.to_item(setting)
+        if isinstance(title, tuple):
+            title = title[0]
+        if query(_('Delete %s?') % title, 'query'):
+            self.setting.value.remove(name)
+            self.body.set_list(self.get_list(), self.body.current())
+
+    def get_list(self):
+        items = [self.setting.to_item(item) for item in self.setting.value.values()]
+        if not items:
+            items.append(self.setting.to_item(None))
+        return items
+
+
+class GroupSetting(Setting):
+    def __init__(self, title, value=None, item_title=None):
+        if value is None:
+            value = SettingsGroup(title)
+        Setting.__init__(self, title, value)
+        self.original = self.value.items()
+        if item_title is None:
+            item_title = _('Name')
+        self.item_title = item_title
+        
+    def changed(self):
+        if len(self.value) != len(self.original):
+            return True
+        for item in self.value.values():
+            if item.changed():
+                return True
+        return False
+
+    def store(self):
+        for item in self.value.values():
+            item.store()
+        self.original = self.value.items()
+
+    def restore(self):
+        self.value.clear()
+        for name, item in self.original:
+            self.value.append(name, item)
+            item.restore()
+
+    def get(self):
+        return dict([(name, item.get()) \
+            for name, item in self.value.items()])
+
+    def set(self, value):
+        self.value.clear()
+        for name, val in value.items():
+            setting = self.get_new(self.item_title, val)
+            if setting is not None:
+                self.value.append(name, setting)
+        self.value.sort()
+        self.original = self.value.items()
+
+    def edit(self, owner=None):
+        return screen.create_window(GroupSettingWindow,
+            title=self.title,
+            setting=self).modal(owner)
+
+    def to_item(self, setting):
+        if setting is not None:
+            return unicode(setting)
+        else:
+            return _('(no data)')
+    
+    def get_new(self, title, value=u''):
+        return StringSetting(title, value)
+
+    def get_new_name(self):
+        i = 1
+        while True:
+            for name in self.value.keys():
+                if name == str(i):
+                    break
+            else:
+                return str(i), self.item_title
+            i += 1
+
+    def __str__(self):
+        return str(_('%s item(s)') % len(self.value))
+        
+    def __unicode__(self):
+        return unicode(_('%s item(s)') % len(self.value))
+                
 
 class ShortkeySettingWindow(Window):
     def __init__(self, *args, **kwargs):
@@ -1481,10 +1591,10 @@ class ShortkeySetting(Setting):
     def __init__(self, title, value=EKey1):
         Setting.__init__(self, title, value)
 
-    def edit(self):
+    def edit(self, owner=None):
         key = screen.create_window(ShortkeySettingWindow,
             title=self.title,
-            value=self).modal()
+            value=self).modal(owner)
         if key is not None:
             self.value = key
             return True
@@ -1502,24 +1612,26 @@ class CustomSetting(Setting):
         Setting.__init__(self, title, value)
         self.edit_callback = edit_callback
 
-    def edit(self):
+    def edit(self, owner=None):
         if self.edit_callback:
-            v = self.edit_callback(self.title, self.value)
+            v = self.edit_callback(self.title, self.value, owner)
             if v is not None:
                 self.value = v
 
 
-
 class SettingsGroup(object):
-    def __init__(self, title='', info=None):
+    def __init__(self, title=None, info=None):
+        if title is None:
+            title = self.__class__.__name__
         self.title = title
         if info is None:
-            info = _('Select for more options...')
+            info = _('(more options)')
         self.info = info
         self.objs = {}
         self.order = []
+        self.hidden = False
 
-    def add(self, name, obj):
+    def append(self, name, obj):
         if isinstance(obj, (SettingsGroup, Setting)):
             self.objs[name] = obj
             self.order.append(name)
@@ -1535,14 +1647,34 @@ class SettingsGroup(object):
         self.objs.clear()
         self.order = []
 
-    def all(self):
+    def allkeys(self):
+        keys = []
+        for name in self.order:
+            keys.append(name)
+            obj = self.objs[name]
+            if isinstance(obj, SettingsGroup):
+                keys.extend(obj.allkeys())
+        return keys
+
+    def items(self):
         return [(x, self.objs[x]) for x in self.order]
+
+    def keys(self):
+        return list(self.order)
+        
+    def values(self):
+        return [self.objs[x] for x in self.order]
 
     def get(self):
         return self
         
     def set(self, value):
         raise AttributeError('Cannot set a SettingsGroup (to %s)' % repr(value))
+
+    def sort(self):
+        def compare(a, b):
+            return -(unicode(self.objs[a].title).lower() < unicode(self.objs[b].title).lower())
+        self.order.sort(compare)
 
     def __getitem__(self, name):
         return self.objs[name]
@@ -1600,6 +1732,10 @@ class Settings(SettingsGroup):
                 obj = self
                 try:
                     for part in name.split('/'):
+                        try:
+                            part = int(part)
+                        except ValueError:
+                            pass
                         obj = obj[part]
                 except KeyError:
                     # old settings / old file version
@@ -1613,7 +1749,7 @@ class Settings(SettingsGroup):
     def save(self):
         import marshal
         def save_group(f, group, path=''):
-            for name, obj in group.all():
+            for name, obj in group.items():
                 if path:
                     curpath = '%s/%s' % (path, name)
                 else:
@@ -1633,20 +1769,20 @@ class Settings(SettingsGroup):
         except IOError:
             pass
 
-    def edit(self):
+    def edit(self, owner=None):
         if self.window:
             self.window.focus = True
             return False
         self.window = screen.create_window(SettingsWindow,
                     settings=self,
                     title=self.title)
-        r = self.window.modal()
+        r = self.window.modal(owner)
         self.window = None
         return r
 
-    def add(self, name, obj):
+    def append(self, name, obj):
         if isinstance(obj, SettingsGroup):
-            SettingsGroup.add(self, name, obj)
+            SettingsGroup.append(self, name, obj)
         else:
             raise TypeError('\'obj\' must be a SettingsGroup object')
 
@@ -1669,15 +1805,16 @@ class SettingsWindow(TabbedWindow):
         menu.append(MenuItem(_('Save'), target=self.save_click))
         menu.append(MenuItem(_('Exit'), target=self.close))
         tabs = []
-        for gname, group in self.settings.all():
-            items = group.all()
-            if not items:
+        for gname, group in self.settings.items():
+            if group.hidden:
+                continue
+            if len(group) == 0:
                 continue
             tab = Tab(group.title)
             tab.group = group
             tab.menu = menu
-            tab.body = Listbox([(unicode(item.title), unicode(item)) \
-                for name, item in items], self.change_click)
+            tab.body = Listbox(self.get_list(group),
+                self.change_click)
             tab.stack = []
             tabs.append(tab)
         if not tabs:
@@ -1685,11 +1822,15 @@ class SettingsWindow(TabbedWindow):
         self.tabs = tabs
         self.modal_result = False
 
+    def get_list(self, group):
+        return [(unicode(item.title), unicode(item)) \
+            for name, item in group.items() if not item.hidden]
+
     def get_changed(self, group=None):
         if group is None:
             group = self.settings
         items = []
-        for name, obj in group.all():
+        for name, obj in group.items():
             if isinstance(obj, SettingsGroup): # SettingsGroup
                 items.extend(self.get_changed(obj))
             elif obj.changed(): # Setting
@@ -1721,20 +1862,21 @@ class SettingsWindow(TabbedWindow):
         if prev is not None and prev.stack:
             prev.group, prev.body = prev.stack[0]
             prev.title = prev.group.title
+            prev.stack = []
 
     def change_click(self):
         tab = self.tab
-        obj = tab.group.all()[tab.body.current()][-1]
+        obj = tab.group.items()[tab.body.current()][-1]
         if isinstance(obj, SettingsGroup): # SettingsGroup
             tab.stack.append((tab.group, tab.body))
             tab.title = obj.title
             tab.group = obj
-            tab.body = Listbox([(unicode(obj.title), unicode(obj)) \
-                for name, obj in obj.all()], self.change_click)
+            tab.body = Listbox(self.get_list(obj),
+                self.change_click)
         else: # Setting
-            if obj.edit():
-                tab.body.set_list([(unicode(obj.title), unicode(obj)) \
-                    for name, obj in tab.group.all()], tab.body.current())
+            if obj.edit(self):
+                tab.body.set_list(self.get_list(tab.group),
+                    tab.body.current())
 
     def save_click(self):
         for item in self.get_changed():

@@ -1,9 +1,16 @@
 try:
 
-    import ped
-
     if __name__ == '__main__':
-        ped.app.start()
+    
+        # *** DISABLE FOR RELEASES ***
+        import sys, os
+        name = os.path.split(os.path.split(sys.argv[0])[0])[1]
+        path = os.path.join('E:\\Python', name)
+        if os.path.exists(path):
+            sys.path.insert(0, path)
+        
+        from ped import app
+        app.start()
 
 except:
 
