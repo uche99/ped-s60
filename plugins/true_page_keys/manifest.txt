@@ -1,4 +1,4 @@
-Folder: true_page_keys
+Package: true_page_keys
 Name: True Page Keys
 Version: 1.00.0
 Ped-Version-Min: 2.30.4

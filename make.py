@@ -25,17 +25,16 @@ def main():
 
     # commands used in 3rd edition build, used twice later
     ped_3rded_system = '''rmdir /s/q build_3rdEd
-                       mkdir build_3rdEd
-                       copy default.py build_3rdEd
-                       copy ped.pyo build_3rdEd\\ped.pyc
-                       copy ui.pyo build_3rdEd\\ui.pyc
-                       copy LICENSE build_3rdEd
-                       mkdir build_3rdEd\\lang
-                       xcopy lang build_3rdEd\\lang /s
-                       mkdir build_3rdEd\\root\\resource\\apps
-                       copy ped_file_browser_icons.mif build_3rdEd\\root\\resource\\apps
-                       %s py2sis --vendor="Arkadiusz Wahlig" --icon=ped.svg --appname=Ped --version=%d.%d.%d --extrasdir=root --lang=EN,GE --verbose %%s build_3rdEd %%s''' % \
-                       ((ensymble,) + version)
+        mkdir build_3rdEd\\plugins build_3rdEd\\lang build_3rdEd\\root\\resource\\apps
+        copy default.py build_3rdEd
+        copy ped.pyo build_3rdEd\\ped.pyc
+        copy ui.pyo build_3rdEd\\ui.pyc
+        copy LICENSE build_3rdEd
+        copy plugins\\__init__.pyo build_3rdEd\\plugins\\__init__.pyc
+        copy ped_file_browser_icons.mif build_3rdEd\\root\\resource\\apps
+        xcopy lang build_3rdEd\\lang /s
+        %s py2sis --vendor="Arkadiusz Wahlig" --icon=ped.svg --appname=Ped --version=%d.%d.%d --extrasdir=root --lang=EN,GE --verbose %%s build_3rdEd %%s''' % \
+        ((ensymble,) + version)
 
     # Rules
     rules = {
@@ -53,8 +52,8 @@ def main():
         
         'ped.aif': (['ped.rss', 'ped.mbm'],
             lambda: system('''aiftool ped ped.mbm''',
-                           PATH='%s\\Epoc32\\tools;%s' % (epocroot2, os.environ['path']),
-                           EPOCROOT='')),
+                PATH='%s\\Epoc32\\tools;%s' % (epocroot2, os.environ['path']),
+                EPOCROOT='')),
         
         'ped.pyo': (['ped.py'],
             lambda: system('''%s -O compile.py ped.py''' % python22)),
@@ -62,24 +61,30 @@ def main():
         'ui.pyo': (['ui.py'],
             lambda: system('''%s -O compile.py ui.py''' % python22)),
         
+        'plugins\\__init__.pyo': (['plugins\\__init__.py'],
+            lambda: system('''%s -O compile.py plugins\\__init__.py''' % python22)),
+
         'Ped_%s_2ndEd.sis' % verstr():
             (['ped_2ndEd.pkg', 'default.py', 'ped.pyo', 'ui.pyo', 'ped.aif', 'ped_2ndEd.app',
-              'ped.rsc', 'ped_file_browser_icons.mbm', 'ped_file_browser_icons.mif', 'LICENSE'],
+                'plugins\\__init__.pyo', 'ped.rsc', 'ped_file_browser_icons.mbm',
+                'ped_file_browser_icons.mif', 'LICENSE'],
             lambda: build_sis_pre3('2ndEd')),
         
         'Ped_%s_3rdEd_unsigned_testrange.sis' % verstr():
-            (['default.py', 'ped.pyo', 'ui.pyo', 'ped.svg', 'ped_file_browser_icons.mif', 'LICENSE'],
+            (['default.py', 'ped.pyo', 'ui.pyo', 'plugins\\__init__.pyo', 'ped.svg',
+                'ped_file_browser_icons.mif', 'LICENSE'],
             # Note. We let ensymble choose a test-range UID for us based on 'Ped' name.
             lambda: system(ped_3rded_system % \
-                           ('--caps=PowerMgmt+ReadDeviceData+WriteDeviceData+TrustedUI+ProtServ+SwEvent+NetworkServices+LocalServices+ReadUserData+WriteUserData+Location+SurroundingsDD+UserEnvironment',
-                           'Ped_%s_3rdEd_unsigned_testrange.sis' % verstr()))),
+                ('--caps=PowerMgmt+ReadDeviceData+WriteDeviceData+TrustedUI+ProtServ+SwEvent+NetworkServices+LocalServices+ReadUserData+WriteUserData+Location+SurroundingsDD+UserEnvironment',
+                'Ped_%s_3rdEd_unsigned_testrange.sis' % verstr()))),
     
         'Ped_%s_3rdEd_no_caps.sis' % verstr():
-            (['default.py', 'ped.pyo', 'ui.pyo', 'ped.svg', 'ped_file_browser_icons.mif', 'LICENSE'],
+            (['default.py', 'ped.pyo', 'ui.pyo', 'plugins\\__init__.pyo', 'ped.svg',
+                'ped_file_browser_icons.mif', 'LICENSE'],
             # Note. This UID was registered on symbiansigned.com
             lambda: system(ped_3rded_system % \
-                           ('--uid=0xA00042B5',
-                           'Ped_%s_3rdEd_no_caps.sis' % verstr()))),
+                ('--uid=0xA00042B5',
+                'Ped_%s_3rdEd_no_caps.sis' % verstr()))),
 
         'all': (['Ped_%s_2ndEd.sis' % verstr(),
             'Ped_%s_3rdEd_unsigned_testrange.sis' % verstr(),

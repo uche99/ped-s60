@@ -1,4 +1,4 @@
-Folder: comments
+Package: comments
 Name: Comments
 Version: 1.00.1
 Ped-Version-Min: 2.30.4

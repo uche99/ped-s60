@@ -60,6 +60,25 @@ except ImportError:
     pass
     
 
+# replacement for missing dict.pop() (PyS60 is based on Python 2.2,
+# dict.pop() was added in 2.3)
+def pop(dict_, key, *default):
+    if default:
+        value = dict_.get(key, *default)
+    else:
+        value = dict_[key]
+    try:
+        del dict_[key]
+    except KeyError:
+        pass
+    return value
+
+# make pop() a global function for all modules
+import __builtin__
+__builtin__.pop = pop
+del __builtin__
+
+
 # threading.Event alike class built around e32.Ao_lock
 class Event(object):
     def __init__(self):
@@ -227,24 +246,6 @@ class Screen(object):
         self.__blank_win = None
         self.rootwin = None
 
-    def create_window(self, klass=None, *args, **kwargs):
-        if klass is None:
-            klass = Window
-        win = klass(self, *args, **kwargs)
-        ofwin = self.focused_window()
-        self.windows.append(win)
-        if isinstance(win, RootWindow):
-            assert self.rootwin is None, 'root window already created'
-            self.rootwin = win
-        nfwin = self.focused_window()
-        if ofwin and ofwin != nfwin:
-            ofwin.focus_changed(False)
-        if nfwin == win:
-            nfwin.focus_changed(True)
-            reset_inactivity()
-        self.__update_fw()
-        return win
-
     def find_windows(self, *classes):
         if not classes:
             classes = (Window,)
@@ -273,21 +274,37 @@ class Screen(object):
         self.__update_fw()
         e32.ao_yield()
 
-    def create_blank_window(self, title=None):
+    def open_blank_window(self, title=None):
         if title is None:
             title = _('Please wait...')
-        if self.__blank_win and self.__blank_win.is_alive():
+        if self.__blank_win and self.__blank_win.is_opened():
             self.__blank_win.title = title
+            self.__blank_win.focus = True
         else:
-            self.__blank_win = self.create_window(BlankWindow, title=title)
-        self.__blank_win.focus = True
+            self.__blank_win = BlankWindow(title=title)
+            self.__blank_win.open()
         return self.__blank_win
 
-    def __get_focus(self, win):
+    def __window_open(self, win):
+        ofwin = self.focused_window()
+        self.windows.append(win)
+        if isinstance(win, RootWindow):
+            assert self.rootwin is None or self.rootwin.is_closed(), \
+                'root window already opened, close the old one first'
+            self.rootwin = win
+        nfwin = self.focused_window()
+        if ofwin and ofwin != nfwin:
+            ofwin.focus_changed(False)
+        if nfwin == win:
+            nfwin.focus_changed(True)
+            reset_inactivity()
+        self.__update_fw()
+
+    def __window_get_focus(self, win):
         # called internally by Window.focus
         return win == self.focused_window()
 
-    def __set_focus(self, win, focus):
+    def __window_set_focus(self, win, focus):
         # called internally by Window.focus
         fwin = self.focused_window()
         if focus:
@@ -321,7 +338,7 @@ class Screen(object):
             self.__control_key_reset(fwin)
             self.__update_fw()
 
-    def __close(self, win):
+    def __window_close(self, win):
         # called internally by Window.close()
         fwin = self.focused_window()
         self.windows.remove(win)
@@ -349,7 +366,10 @@ class Screen(object):
             if mask & _umTitle:
                 app.title = unicode(win.title)
             if mask & _umMenu:
-                app.menu = win.menu.fw_menu()
+                if win.menu is not None:
+                    app.menu = win.menu.fw_menu()
+                else:
+                    app.menu = []
             if mask & _umExit:
                 app.exit_key_handler = win.close
 
@@ -364,7 +384,7 @@ class Screen(object):
             win._Window__body.focus = False
         if in_time and self.__control_key_last is None:
             self.__control_key_reset(win)
-            schedule(self.__window_selector)
+            schedule(self.__selector)
             return
         if win is not None:
             def make_key_handler(key):
@@ -414,7 +434,7 @@ class Screen(object):
             schedule(lambda self=self, body=win._Window__body: restore(self, body))
         self.__control_key_last = key
 
-    def __window_selector(self):
+    def __selector(self):
         win = self.focused_window()
         # if the focused window shouldn't appear in the selector, try to
         # use one of its owners instead to get the title; if none of them
@@ -453,48 +473,65 @@ class Screen(object):
 
 
 class Window(object):
-    def __init__(self, screen, title=None, size=None, orientation=None, selector=True, **kwargs):
-        self.__screen = screen
-        if title is None:
-            title = self.__class__.__name__
-        self.__title = title
+    def __init__(self, **kwargs):
+        self.__status = 0
+        self.__title = pop(kwargs, 'title', self.__class__.__name__)
         self.__body = None
-        self.__menu = Menu()
-        if size is None:
+        self.__menu = pop(kwargs, 'menu', Menu())
+        if 'size' in kwargs:
+            self.__size = pop(kwargs, 'size')
+        else:
             try:
-                size = self.__screen.rootwin.size
+                self.__size = screen.rootwin.size
             except AttributeError:
-                size = sizNormal
-        self.__size = size
-        if orientation is None:
+                # no rootwin yet
+                self.__size = sizNormal
+        if 'orientation' in kwargs:
+            self.__orientation = pop(kwargs, 'orientation')
+        else:
             try:
-                orientation = self.__screen.rootwin.orientation
+                self.__orientation = screen.rootwin.orientation
             except AttributeError:
-                orientation = oriAutomatic
-        self.__orientation = orientation
-        self.selector = selector
+                # no rootwin yet
+                self.__orientation = oriAutomatic
+        self.selector = pop(kwargs, 'selector', True)
         self.__overlapped = None
         self.__keys = []
         self.__control_keys = []
         self.__modal_event = None
         self.modal_result = None
+        if kwargs:
+            raise TypeError('Window.__init__() got an unexpected keyword argument(s): %s' % \
+                ', '.join([repr(x) for x in kwargs.keys()]))
 
-    def is_alive(self):
-        return (self.__screen is not None)
+    def open(self, focus=True):
+        if self.__status == 0:
+            screen._Screen__window_open(self)
+            if focus:
+                screen._Screen__window_set_focus(self, True)
+            self.__status = 2
+
+    def is_opened(self):
+        return self.__status == 2
+
+    def is_closed(self):
+        return self.__status == 1
 
     def can_close(self):
-        return not self.__overlapped or not self.__overlapped.is_alive()
+        return not self.__overlapped or not self.__overlapped.is_opened()
 
     def close(self):
-        if self.is_alive() and self.can_close():
-            # we want is_alive() to return False when we call screen._Screen__close()
-            # so we clear self.__screen first
-            screen = self.__screen
-            self.__screen = None
-            screen._Screen__close(self)
+        if self.is_opened() and self.can_close():
+            # we want is_opened() to return False when we call screen._Screen__window_close()
+            self.__status = 1
+            screen._Screen__window_close(self)
             if self.__body is not None:
                 for key in self.__keys:
                     self.__body.bind(key, None)
+                for key in self.__control_keys:
+                    self.__body.bind(key, None)
+                self.__body = None
+            self.__menu = None
             if self.__modal_event:
                 self.__modal_event.set()
                 # this delay is here to allow the active object that called modal()
@@ -506,7 +543,9 @@ class Window(object):
         return False
 
     def modal(self, owner=None):
-        if self.is_alive():
+        if not self.is_closed():
+            if not self.is_opened():
+                self.open()
             assert self.__modal_event is None, 'modal() already in progress'
             self.__modal_event = Event()
             self.focus = True
@@ -521,7 +560,7 @@ class Window(object):
             return self.modal_result
 
     def key_press(self, key):
-        return False
+        pass
 
     def control_key_press(self, key):
         return False
@@ -531,7 +570,7 @@ class Window(object):
 
     def reset_control_key(self):
         if self.focus:
-            self.__screen._Screen__control_key_reset(self)
+            screen._Screen__control_key_reset(self)
 
     def __set_title(self, title):
         self.__title = title
@@ -540,8 +579,8 @@ class Window(object):
     def __set_body(self, body):
         self.__body = body
         self.__update_fw(_umBody)
-        if self.is_alive() and hasattr(body, 'bind'):
-            body.bind(EKeyYes, self.__screen._Screen__ekeyyes_handler)
+        if not self.is_closed() and hasattr(body, 'bind'):
+            body.bind(EKeyYes, screen._Screen__ekeyyes_handler)
             def make_key_handler(key):
                 return lambda: self.key_press(key)
             for key in self.__keys:
@@ -588,16 +627,16 @@ class Window(object):
 
     def __update_fw(self, mask=_umAll):
         if self.focus:
-            self.__screen._Screen__update_fw(mask)
+            screen._Screen__update_fw(mask)
 
     def __get_focus(self):
-        if self.is_alive():
-            return self.__screen._Screen__get_focus(self)
+        if self.is_opened():
+            return screen._Screen__window_get_focus(self)
         return False
 
     def __set_focus(self, focus):
-        if self.is_alive():
-            self.__screen._Screen__set_focus(self, focus)
+        if self.is_opened():
+            screen._Screen__window_set_focus(self, focus)
 
     def __set_overlapped(self, win):
         self.__overlapped = win
@@ -618,26 +657,25 @@ class Window(object):
 
 
 class RootWindow(Window):
-    def __init__(self, *args, **kwargs):
-        if 'title' not in kwargs:
-            kwargs['title'] = app.title
-        if 'selector' not in kwargs:
-            kwargs['selector'] = False
-        Window.__init__(self, *args, **kwargs)
+    def __init__(self, **kwargs):
+        self.color = pop(kwargs, 'color', 0x888888)
+        kwargs.setdefault('title', app.title)
+        kwargs.setdefault('selector', False)
+        Window.__init__(self, **kwargs)
         self.body = Canvas(redraw_callback=self.redraw_callback,
                            event_callback=self.event_callback)
 
     def redraw_callback(self, rect):
-        self.body.clear(0x888888)
+        self.body.clear(self.color)
 
     def event_callback(self, event):
         # can be overridden
         pass
 
     def close(self):
-        if self.is_alive():
+        if self.is_opened():
             # close all windows except root window
-            if not self._Window__screen.close_windows():
+            if not screen.close_windows():
                 return False
             # close root window (self)
             return Window.close(self)
@@ -645,14 +683,14 @@ class RootWindow(Window):
     
 
 class BlankWindow(Window):
-    def __init__(self, *args, **kwargs):
-        if 'selector' not in kwargs:
-            kwargs['selector'] = False
-        Window.__init__(self, *args, **kwargs)
+    def __init__(self, **kwargs):
+        self.color = pop(kwargs, 'color', 0x888888)
+        kwargs.setdefault('selector', False)
+        Window.__init__(self, **kwargs)
         self.body = Canvas(redraw_callback=self.redraw_callback)
 
     def redraw_callback(self, rect):
-        self.body.clear(0xcccccc)
+        self.body.clear(self.color)
 
     def focus_changed(self, focus):
         Window.focus_changed(self, focus)
@@ -661,22 +699,18 @@ class BlankWindow(Window):
 
 
 class Tab(object):
-    def __init__(self, title=None, body=None, menu=None, keys=None, control_keys=None):
-        if title is None:
-            title = self.__class__.__name__
-        if menu is None:
-            menu = Menu()
-        if keys is None:
-            keys = []
-        if control_keys is None:
-            control_keys = []
-        self.__title = title
-        self.__body = body
-        self.__menu = menu
-        self.__keys = keys
-        self.__control_keys = control_keys
-        # window is set by TabbedWindow.__set_tabs
+    def __init__(self, **kwargs):
+        # title=None, body=None, menu=None, keys=None, control_keys=None
+        self.__title = pop(kwargs, 'title', self.__class__.__name__)
+        self.__menu = pop(kwargs, 'menu', Menu())
+        self.__body = pop(kwargs, 'body', None)
+        self.__keys = pop(kwargs, 'keys', ())
+        self.__control_keys = pop(kwargs, 'control_keys', ())
+        # window attribute is set by TabbedWindow.__set_tabs()
         self.window = None
+        if kwargs:
+            raise TypeError('Tab.__init__() got an unexpected keyword argument(s): %s' % \
+                ', '.join([repr(x) for x in kwargs.keys()]))
 
     def __set_window_property(self, prop, value):
         if self.window is not None:
@@ -712,12 +746,13 @@ class Tab(object):
 
 
 class TabbedWindow(Window):
-    def __init__(self, *args, **kwargs):
-        Window.__init__(self, *args, **kwargs)
+    def __init__(self, **kwargs):
+        tabs = pop(kwargs, 'tabs', ())
+        Window.__init__(self, **kwargs)
         self.__tabs = ()
         self.__active_tab = -1
-        if 'tabs' in kwargs:
-            self.__set_tabs(kwargs['tabs'])
+        if tabs:
+            self.__set_tabs(tabs)
 
     def focus_changed(self, focus):
         Window.focus_changed(self, focus)
@@ -790,25 +825,136 @@ class TabbedWindow(Window):
     active_tab = property(lambda self: self.__active_tab, __set_active_tab)
 
 
+# subclass together with Window to get a Listbox window with user items filtering
+class FilteredListboxModifier(object):
+
+    # nomatch item will be displayed if there are no items that match the current filter
+    def __init__(self, nomatch_item):
+        # add this item to your options menu (self.menu) if you like
+        self.filter_menu_item = MenuItem(_('Edit filter...'), target=self.__edit)
+        self.__menu = Menu()
+        self.__menu.append(MenuItem(_('Show all'), target=self.__showall))
+        self.__menu.append(MenuItem(_('Edit filter...'), target=self.__edit))
+        self.__nomatch = nomatch_item
+        self.keys += (EKeyStar,)
+        self.__list = []
+        self.__filter = None
+        self.__callback = None
+        self.__title = self.title
+        
+    def key_press(self, key):
+        if key == EKeyStar:
+            if self.__filter is not None:
+                item = self.__menu.popup()
+                if item is not None:
+                    item.target()
+            else:
+                self.__edit()
+
+    # use instead of body.current(), may return -1 if "nomatch" item is displayed
+    def current(self):
+        flst = self.filter_list(self.__list)
+        try:
+            return self.__list.index(flst[self.body.current()])
+        except ValueError:
+            return -1
+
+    def filter_list(self, lst):
+        if self.__filter is not None:
+            lst = [item for item in lst \
+                if self.filter_item(item, self.__filter)]
+            if not lst:
+                lst.append(self.__nomatch)
+        return lst
+    
+    # override to change filtering behaviour, item is an item from your list,
+    # filter is the filter entered by user (unicode)
+    def filter_item(self, item, filter):
+        if isinstance(item, tuple):
+            item = item[0]
+        return (item.lower().find(filter) >= 0)
+
+    # use instead of body = Listbox()
+    def set_listbox(self, lst, callback):
+        self.__list = list(lst)
+        flst = self.filter_list(self.__list)
+        self.__callback = callback
+        self.body = Listbox(flst, self.__select)
+
+    # use instead of body.set_list()
+    def set_list(self, lst, act=0):
+        if lst is not None:
+            self.__list = list(lst)
+        flst = self.filter_list(self.__list)
+        try:
+            act = flst.index(self.__list[act])
+        except ValueError:
+            if act >= len(flst):
+                act = len(flst)-1
+        assert act >= 0
+        self.body.set_list(flst, act)
+
+    # changes current filter, pass None to show all
+    def set_filter(self, filter):
+        if filter is None:
+            act = self.current()
+            self.__filter = None
+            self.filter_menu_item.title = _('Edit filter...')
+            self.filter_menu_item.target = self.__edit
+            try:
+                del self.filter_menu_item.submenu
+            except AttributeError:
+                pass
+        else:
+            act = max(self.current(), 0)
+            self.__filter = filter.lower()
+            self.filter_menu_item.title = _('Filter')
+            self.filter_menu_item.submenu = self.__menu
+            try:
+                del self.filter_menu_item.target
+            except AttributeError:
+                pass
+        self.set_list(None, act)
+        self.__set_title(self.__title)
+        self.update_menu()
+
+    def __showall(self):
+        self.set_filter(None)
+        
+    def __edit(self):
+        filter = query(_('Filter:'), 'text', self.__filter)
+        if filter is not None:
+            self.set_filter(filter)
+            
+    def __select(self):
+        if self.current() >= 0:
+            self.__callback()
+
+    def __set_title(self, title):
+        self.__title = title
+        if self.__filter is not None:
+            self.title = '%s | %s' % (self.__filter, title)
+        else:
+            self.title = title
+
+    filter_title = property(lambda self: self.__title, __set_title)
+
+
 fbmOpen, \
 fbmSave = range(2)
 
-class FileBrowserWindow(Window):
+class FileBrowserWindow(Window, FilteredListboxModifier):
     links = []
     icons_path = ''
     settings_path = ''
     max_recents = 7
 
-    def __init__(self, *args, **kwargs):
-        if 'title' not in kwargs:
-            kwargs['title'] = _('File browser')
-        Window.__init__(self, *args, **kwargs)
-        self.mode = kwargs.get('mode', fbmOpen)
-        self.filter_ext = kwargs.get('filter_ext', ())
-        self.path, self.name = os.path.split(kwargs.get('path', ''))
-        # gtitle is the global title, 'File browser' or set by user
-        # ctitle is the current title, together with filter they make the window title
-        self.gtitle = self.ctitle = self.title
+    def __init__(self, **kwargs):
+        self.mode = pop(kwargs, 'mode', fbmOpen)
+        self.filter_ext = pop(kwargs, 'filter_ext', ())
+        self.path, self.name = os.path.split(pop(kwargs, 'path', ''))
+        kwargs.setdefault('title', _('File browser'))
+        Window.__init__(self, **kwargs)
         if not os.path.exists(self.icons_path):
             raise IOError('Missing file browser icons file')
         icons_type = os.path.splitext(self.icons_path)[-1].lower()
@@ -826,23 +972,19 @@ class FileBrowserWindow(Window):
                 self.icons[name] = Icon(path, mif, mif+1)
             else:
                 self.icons[name] = Icon(path, mbm, mbm+1)
+        FilteredListboxModifier.__init__(self, (_('(no match)'), self.icons['info']))
+        self.gtitle = self.filter_title
         self.settings = Settings(self.settings_path)
         self.settings.append('main', SettingsGroup())
         self.settings.main.append('recents', Setting('Recents', []))
         self.settings.load_if_available()
-        self.body = Listbox([(_('(empty)'), self.icons['info'])], self.select_click)
-        self.keys += (EKeyLeftArrow, EKeyRightArrow, EKeyStar, EKey0, EKeyHash, EKeyBackspace)
+        self.filter_nomatch_item = (_('(no match)'), self.icons['info'])
+        self.set_listbox([(_('(empty)'), self.icons['info'])], self.select_click)
+        self.keys += (EKeyLeftArrow, EKeyRightArrow, EKey0, EKeyHash, EKeyBackspace)
         self.control_keys += (EKeyUpArrow, EKeyDownArrow)
         self.busy = False
         self.DRIVE, self.DIR, self.FILE, self.INFO = range(4)
-        self.filterstr = u''
         self.update(self.name)
-
-    def close(self):
-        r = Window.close(self)
-        if r:
-            self.menu = Menu()
-        return r
 
     def add_link(cls, link, title=None):
         if link and link[1:] != ':\\' and os.path.exists(link):
@@ -876,9 +1018,9 @@ class FileBrowserWindow(Window):
             return self.icons['empty']
 
     def update(self, mark=''):
-        self.body.set_list([(_('Loading...'), self.icons['loading'])])
+        self.set_list([(_('Loading...'), self.icons['loading'])])
         if self.path == '':
-            self.ctitle = self.gtitle
+            self.filter_title = self.gtitle
             e32.ao_yield()
             # drives
             self.lstall = [(self.DRIVE, self.icons['drive'], x, x.encode('utf8')) for x in e32.drive_list()]
@@ -890,7 +1032,7 @@ class FileBrowserWindow(Window):
                     return (self.DIR, self.icons['folder'], link[1], link[0])
             self.lstall += map(format, self.links)
         elif self.path == 'recents':
-            self.ctitle = _('Recent files')
+            self.filter_title = _('Recent files')
             def format(filename):
                 path, name = os.path.split(filename)
                 title = _('%s in %s') % (name.decode('utf8'), path.decode('utf8'))
@@ -907,9 +1049,9 @@ class FileBrowserWindow(Window):
         else:
             if self.path[-2:] == ':\\':
                 # we are in drive's root directory
-                self.ctitle = self.path[:2].decode('utf8')
+                self.filter_title = self.path[:2].decode('utf8')
             else:
-                self.ctitle = os.path.split(self.path)[1].decode('utf8')
+                self.filter_title = os.path.split(self.path)[1].decode('utf8')
             e32.ao_yield()
             def format(name):
                 if os.path.isfile(os.path.join(self.path, name)):
@@ -942,7 +1084,7 @@ class FileBrowserWindow(Window):
                 pass
         if not self.lstall:
             self.lstall.append((self.INFO, self.icons['info'], _('(empty)'), None))
-        self.set_list(active, dofilter=True)
+        self.set_lstall(active)
         self.make_menu()
 
     def make_menu(self):
@@ -959,66 +1101,54 @@ class FileBrowserWindow(Window):
             menu.append(MenuItem(_('Rename'), target=self.rename_click))
             menu.append(MenuItem(_('Delete'), target=self.delete_click))
             menu.append(MenuItem(_('Create folder...'), target=self.mkdir_click))
-        if self.filterstr:
-            fmenu = efmenu = Menu()
-            fmenu.append(MenuItem(_('Show all'), target=self.showall_click))
-            menu.append(MenuItem(_('Filter'), submenu=fmenu))
-        else:
-            fmenu = None
-            efmenu = menu
-        efmenu.append(MenuItem(_('Edit filter...'), target=self.editfilter_click))
+        menu.append(self.filter_menu_item)
         menu.append(MenuItem(_('Exit'), target=self.close))
         self.menu = menu
-        self.filtermenu = fmenu
 
-    def set_list(self, active=None, dofilter=False):
+    def set_lstall(self, active=None):
         if active is None:
-            active = self.body.current()
+            active = self.current()
         lst = self.lstall
         if self.filter_ext:
             lst = [x for x in lst if x[0] != self.FILE or \
                 os.path.splitext(x[3])[-1].lower() in self.filter_ext]
-        if dofilter:
-            if self.filterstr:
-                lst = [x for x in lst if x[0] == self.INFO or \
-                    unicode(x[2]).lower().find(self.filterstr) >= 0]
-                if not lst:
-                    lst.append((self.INFO, self.icons['info'], _('(no match)'), None))
-                self.title = '%s | %s' % (self.filterstr, self.ctitle)
-            else:
-                self.lst = self.lstall
-                self.title = self.ctitle
         try:
             active = lst.index(self.lstall[active])
         except ValueError:
             active = 0
-        self.body.set_list([(unicode(x[2]), x[1]) for x in lst], active)
+        self.set_list([(unicode(x[2]), x[1]) for x in lst], active)
         self.lst = lst
 
     def select_click(self):
         if self.busy:
             return
         self.busy = True
-        item = self.lst[self.body.current()]
-        if item[0] == self.DRIVE:
-            self.path = '%s\\' % item[3]
-            self.filterstr = u''
-            self.update()
-        elif item[0] == self.DIR:
-            self.path = os.path.join(self.path, item[3])
-            self.filterstr = u''
-            self.update()
-        elif item[0] == self.FILE:
-            if self.mode == fbmOpen:
-                if self.path == 'recents':
-                    self.path = ''
+        try:
+            i = self.current()
+            if i < 0:
+                return
+            item = self.lst[i]
+            if item[0] == self.DRIVE:
+                self.path = '%s\\' % item[3]
+                self.set_filter(None)
+                self.update()
+            elif item[0] == self.DIR:
                 self.path = os.path.join(self.path, item[3])
-                self.modal_result = self.path
-                self.add_recent(self.path)
-                self.close()
-            else:
-                self.save_click(os.path.splitext(item[3])[0] + os.path.splitext(self.name)[1])
-        self.busy = False
+                self.set_filter(None)
+                self.update()
+            elif item[0] == self.FILE:
+                if self.mode == fbmOpen:
+                    if self.path == 'recents':
+                        self.path = ''
+                    self.path = os.path.join(self.path, item[3])
+                    self.modal_result = self.path
+                    self.add_recent(self.path)
+                    self.close()
+                else:
+                    self.save_click(os.path.splitext(item[3])[0] +\
+                        os.path.splitext(self.name)[1])
+        finally:
+            self.busy = False
 
     def key_press(self, key):
         if key == EKeyLeftArrow:
@@ -1027,47 +1157,29 @@ class FileBrowserWindow(Window):
             self.enter_click()
         elif key == EKeyBackspace:
             self.delete_click()
-        elif key == EKeyStar:
-            self.filter_click()
         elif key == EKey0:
             self.info_click()
         elif key == EKeyHash:
             self.drives_click()
         else:
-            return Window.key_press(self, key)
+            FilteredListboxModifier.key_press(self, key)
+            Window.key_press(self, key)
 
     def control_key_press(self, key):
         if key == EKeyUpArrow:
-            self.set_list(self.body.current() - 5)
+            self.set_lstall(self.current() - 5)
         elif key == EKeyDownArrow:
-            self.set_list(self.body.current() + 5)
+            self.set_lstall(self.current() + 5)
         else:
             return Window.control_key_press(self, key)
         # return False to prevent flashing
         return False
 
-    def filter_click(self):
-        if self.filtermenu is not None:
-            item = self.filtermenu.popup()
-            if item:
-                item.target()
-        else:
-            self.editfilter_click()
-
-    def showall_click(self):
-        self.filterstr = u''
-        self.set_list(dofilter=True)
-        self.make_menu()
-
-    def editfilter_click(self):
-        f = query(_('Filter:'), 'text', self.filterstr)
-        if f:
-            self.filterstr = f.lower()
-            self.set_list(dofilter=True)
-            self.make_menu()
-
     def enter_click(self):
-        item = self.lst[self.body.current()]
+        i = self.current()
+        if i < 0:
+            return
+        item = self.lst[i]
         if item[0] == self.FILE:
             path, name = os.path.split(item[3])
             if path:
@@ -1083,14 +1195,14 @@ class FileBrowserWindow(Window):
                 self.path = ''
             else:
                 self.path, mark = os.path.split(self.path)
-            self.filterstr = u''
+            self.set_filter(None)
             self.update(mark)
 
     def drives_click(self):
         if self.path != '':
             mark = self.path[:2]
             self.path = ''
-            self.filterstr = u''
+            self.set_filter(None)
             self.update(mark)
 
     def save_click(self, name=None):
@@ -1120,7 +1232,10 @@ class FileBrowserWindow(Window):
         self.close()
 
     def delete_click(self):
-        item = self.lst[self.body.current()]
+        i = self.current()
+        if i < 0:
+            return
+        item = self.lst[i]
         if item[0] not in [self.FILE, self.DIR]:
             return
         if query(_('Delete %s?') % item[2], 'query'):
@@ -1135,7 +1250,10 @@ class FileBrowserWindow(Window):
                 note(_('Cannot delete'), 'error')
 
     def rename_click(self):
-        item = self.lst[self.body.current()]
+        i = self.current()
+        if i < 0:
+            return
+        item = self.lst[i]
         if item[0] not in [self.FILE, self.DIR]:
             return
         name, ext = os.path.splitext(item[3])
@@ -1174,7 +1292,10 @@ class FileBrowserWindow(Window):
                 note(_('Cannot create folder'), 'error')
 
     def info_click(self):
-        item = self.lst[self.body.current()]
+        i = self.current()
+        if i < 0:
+            return
+        item = self.lst[i]
         if item[0] not in [self.DRIVE, self.FILE, self.DIR] or item[3] == 'recents':
             return
         if item[0] == self.DRIVE:
@@ -1330,6 +1451,7 @@ class ChoiceSetting(Setting):
     def __init__(self, title, value=None, choices=[], **kwargs):
         Setting.__init__(self, title, value)
         self.choices = choices
+        # args for Menu.popup()
         self.kwargs = kwargs
 
     def edit(self, owner=None):
@@ -1350,6 +1472,7 @@ class ChoiceValueSetting(Setting):
     def __init__(self, title, value=None, choices=[], **kwargs):
         Setting.__init__(self, title, value)
         self.choices = choices
+        # args for Menu.popup()
         self.kwargs = kwargs
 
     def edit(self, owner=None):
@@ -1428,9 +1551,9 @@ class DateSetting(Setting):
 
 
 class GroupSettingWindow(Window):
-    def __init__(self, *args, **kwargs):
-        Window.__init__(self, *args, **kwargs)
-        self.setting = kwargs['setting']
+    def __init__(self, **kwargs):
+        self.setting = pop(kwargs, 'setting')
+        Window.__init__(self, **kwargs)
         self.body = Listbox(self.get_list(), self.change_click)
         self.menu.append(MenuItem(_('Add'), target=self.add_click))
         self.menu.append(MenuItem(_('Change'), target=self.change_click))
@@ -1442,8 +1565,8 @@ class GroupSettingWindow(Window):
     def key_press(self, key):
         if key == EKeyBackspace:
             self.remove_click()
-            return False
-        return Window.key_press(self, key)
+            return
+        Window.key_press(self, key)
 
     def change_click(self):
         try:
@@ -1537,9 +1660,12 @@ class GroupSetting(Setting):
         self.original = self.value.items()
 
     def edit(self, owner=None):
-        return screen.create_window(GroupSettingWindow,
-            title=self.title,
+        items = self.value.items()
+        changed = GroupSettingWindow(title=self.title,
             setting=self).modal(owner)
+        if changed:
+            self.original = items
+        return changed
 
     def to_item(self, setting):
         if setting is not None:
@@ -1568,12 +1694,13 @@ class GroupSetting(Setting):
                 
 
 class ShortkeySettingWindow(Window):
-    def __init__(self, *args, **kwargs):
-        Window.__init__(self, *args, **kwargs)
+    def __init__(self, **kwargs):
+        self.value = pop(kwargs, 'value', None)
+        text = pop(kwargs, 'text', None)
+        Window.__init__(self, **kwargs)
         self.body = Text()
-        self.value = kwargs.get('value', None)
-        if 'text' in kwargs:
-            self.body.add(unicode(kwargs['text']))
+        if text is not None:
+            self.body.add(unicode(text))
         else:
             self.body.add(u'%s\n\n%s\n' % \
                 (_('Press a new shortkey (green key followed by a 0-9, * or # key) or close this window to cancel.'),
@@ -1592,8 +1719,7 @@ class ShortkeySetting(Setting):
         Setting.__init__(self, title, value)
 
     def edit(self, owner=None):
-        key = screen.create_window(ShortkeySettingWindow,
-            title=self.title,
+        key = ShortkeySettingWindow(title=self.title,
             value=self).modal(owner)
         if key is not None:
             self.value = key
@@ -1773,9 +1899,8 @@ class Settings(SettingsGroup):
         if self.window:
             self.window.focus = True
             return False
-        self.window = screen.create_window(SettingsWindow,
-                    settings=self,
-                    title=self.title)
+        self.window = SettingsWindow(settings=self,
+            title=self.title)
         r = self.window.modal(owner)
         self.window = None
         return r
@@ -1794,12 +1919,11 @@ class Settings(SettingsGroup):
 
 
 class SettingsWindow(TabbedWindow):
-    def __init__(self, *args, **kwargs):
-        if 'title' not in kwargs:
-            kwargs['title'] = _('Settings')
-        TabbedWindow.__init__(self, *args, **kwargs)
+    def __init__(self, **kwargs):
+        kwargs.setdefault('title', _('Settings'))
+        self.settings = pop(kwargs, 'settings')
+        TabbedWindow.__init__(self, **kwargs)
         self.maintitle = self.title
-        self.settings = kwargs['settings']
         menu = Menu()
         menu.append(MenuItem(_('Change'), target=self.change_click))
         menu.append(MenuItem(_('Save'), target=self.save_click))
@@ -1810,9 +1934,8 @@ class SettingsWindow(TabbedWindow):
                 continue
             if len(group) == 0:
                 continue
-            tab = Tab(group.title)
+            tab = Tab(title=group.title, menu=menu)
             tab.group = group
-            tab.menu = menu
             tab.body = Listbox(self.get_list(group),
                 self.change_click)
             tab.stack = []

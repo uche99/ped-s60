@@ -1,8 +1,9 @@
 #
-# default.py
+# comments
 #
-# Ped plugin adding a configurable shortkey to insert/remove comment char
-# from the beginning of a line.
+# Ped plugin adding a function to insert/remove comment char (#)
+# from the beginning of a line. The function can be assigned
+# to a shortcut using standard Ped 2.30.4+ settings dialog.
 #
 # Copyright (c) 2008, Arkadiusz Wahlig
 # <arkadiusz.wahlig@gmail.com>
@@ -44,10 +45,12 @@ def comment_line(self):
     # move the cursor to the new position
     self.body.set_pos(pos)
 
-if __name__ == '__main__':
-    # patch the ped.PythonFileWindow.get_shortcuts classmethod
-    old_get_shortcuts = repattr(ped.PythonFileWindow, 'get_shortcuts',
-        classmethod(get_shortcuts))
-        
-    # add the ped.PythonFileWindow.comment_line method
-    ped.PythonFileWindow.comment_line = comment_line
+# get the translator object for this plugin
+_ = ped.get_plugin_translator(__file__)
+
+# patch the ped.PythonFileWindow.get_shortcuts classmethod
+old_get_shortcuts = ped.repattr(ped.PythonFileWindow, 'get_shortcuts',
+    classmethod(get_shortcuts))
+    
+# add the ped.PythonFileWindow.comment_line method
+ped.PythonFileWindow.comment_line = comment_line

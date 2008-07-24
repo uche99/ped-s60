@@ -81,6 +81,9 @@ class GlobalWindowModifier(object):
     def __init__(self):
         self.shortcuts = {}
 
+    def open(self):
+        self.apply_settings()
+
     def focus_changed(self, focus):
         if focus:
             try:
@@ -179,10 +182,40 @@ class GlobalWindowModifier(object):
             item.target()
         self.reset_control_key()
 
+    def apply_settings(self):
+        self.set_shortcuts()
+
+    # sets all shortcuts defined in app.settings.main.shortcuts
+    def set_shortcuts(self):
+        items = dict(self.get_shortcuts_items())
+        for key, val in app.settings.main.shortcuts.items():
+            if val:
+                try:
+                    item = items[val]
+                except KeyError:
+                    self.set_shortcut(key, None)
+                else:
+                    self.set_shortcut(key, items[val])
+            else:
+                self.set_shortcut(key, None)
+
+    def update_settings(cls):
+        try:
+            ui.screen.rootwin.focus = True
+        except AttributeError:
+            pass
+        for win in ui.screen.find_windows(GlobalWindowModifier):
+            win.apply_settings()
+        try:
+            ui.screen.rootwin.focus = False
+        except AttributeError:
+            pass
+    update_settings = classmethod(update_settings)
+
 
 class RootWindow(ui.RootWindow, GlobalWindowModifier):
-    def __init__(self, *args, **kwargs):
-        ui.RootWindow.__init__(self, *args, **kwargs)
+    def __init__(self, **kwargs):
+        ui.RootWindow.__init__(self, **kwargs)
         GlobalWindowModifier.__init__(self)
         self.no_popup_menu = False
         self.keys += (ui.EKeySelect,)
@@ -191,6 +224,10 @@ class RootWindow(ui.RootWindow, GlobalWindowModifier):
         # setup stdio redirection
         self.old_stdio = sys.stdin, sys.stdout, sys.stderr
         sys.stdin = sys.stdout = sys.stderr = StdIOWrapper()
+
+    def open(self, focus=True):
+        GlobalWindowModifier.open(self)
+        ui.RootWindow.open(self, focus)
 
     def redraw_callback(self, rect):
         ui.RootWindow.redraw_callback(self, rect)
@@ -226,7 +263,7 @@ class RootWindow(ui.RootWindow, GlobalWindowModifier):
     def key_press(self, key):
         if key == ui.EKeySelect:
             if self.no_popup_menu:
-                return True
+                return
             menu = ui.Menu(_('File'))
             menu.append(ui.MenuItem(_('Open...'), target=app.open_click))
             def make_target(klass):
@@ -242,22 +279,22 @@ class RootWindow(ui.RootWindow, GlobalWindowModifier):
                     target()
                     self.no_popup_menu = False
                 ui.schedule(do)
-                return True
-        return ui.RootWindow.key_press(self, key)
+        else:
+            ui.RootWindow.key_press(self, key)
 
     def focus_changed(self, focus):
         GlobalWindowModifier.focus_changed(self, focus)
-        ui.Window.focus_changed(self, focus)
+        ui.RootWindow.focus_changed(self, focus)
 
     def control_key_press(self, key):
         if GlobalWindowModifier.control_key_press(self, key):
             return True
-        return ui.Window.control_key_press(self, key)
+        return ui.RootWindow.control_key_press(self, key)
 
 
 class Window(ui.Window, GlobalWindowModifier):
-    def __init__(self, *args, **kwargs):
-        ui.Window.__init__(self, *args, **kwargs)
+    def __init__(self, **kwargs):
+        ui.Window.__init__(self, **kwargs)
         GlobalWindowModifier.__init__(self)
         try:
             menu = ui.screen.rootwin.menu.copy()
@@ -266,15 +303,13 @@ class Window(ui.Window, GlobalWindowModifier):
         except AttributeError:
             # in case shell is opened to display an error while Ped is closing
             pass
+            
+    def open(self, focus=True):
+        GlobalWindowModifier.open(self)
+        ui.Window.open(self, focus)
 
     def init_menu(self, menu):
         pass
-
-    def close(self):
-        r = ui.Window.close(self)
-        if r:
-            self.menu = ui.Menu()
-        return r
 
     def focus_changed(self, focus):
         GlobalWindowModifier.focus_changed(self, focus)
@@ -287,14 +322,13 @@ class Window(ui.Window, GlobalWindowModifier):
 
 
 class TextWindow(Window):
-    def __init__(self, *args, **kwargs):
-        Window.__init__(self, *args, **kwargs)
+    def __init__(self, **kwargs):
+        Window.__init__(self, **kwargs)
         self.body = ui.Text()
         self.find_text = u''
         self.keys += (ui.EKeyEnter, ui.EKeySelect, ui.EKeyHome)
         self.control_keys += (ui.EKeyLeftArrow, ui.EKeyRightArrow,
                               ui.EKeyUpArrow, ui.EKeyDownArrow, ui.EKeyEdit)
-        self.apply_settings()
 
     def init_menu(self, menu):
         edit_menu = ui.Menu(_('Edit'))
@@ -327,16 +361,14 @@ class TextWindow(Window):
         if key == ui.EKeySelect:
             self.body.add(u'\n')
             ui.schedule(self.enter_key_press)
-            return True
         elif key == ui.EKeyEnter:
             ui.schedule(self.enter_key_press)
-            return True
         elif key == ui.EKeyHome:
             # keep the behavior of self.move_beg_of_line() if Home key (on an
             # external keyboard) is pressed
             self.move_beg_of_line(immediate=False)
-            return False
-        return Window.key_press(self, key)
+        else:
+            Window.key_press(self, key)
 
     def control_key_press(self, key):
         if key == ui.EKeyLeftArrow:
@@ -385,17 +417,17 @@ class TextWindow(Window):
             osize, oflags = 0, 0
             extended = False
         do = False
-        font = kwargs.get('font', ofont)
-        size = kwargs.get('size', osize)
-        if kwargs.get('antialias', oflags & 16):
+        font = pop(kwargs, 'font', ofont)
+        size = pop(kwargs, 'size', osize)
+        if pop(kwargs, 'antialias', oflags & 16):
             flags = 16 # graphics.FONT_ANTIALIAS
         else:
             flags = 32 # graphics.FONT_NO_ANTIALIAS
-        if kwargs.get('bold', self.body.style & ui.STYLE_BOLD):
+        if pop(kwargs, 'bold', self.body.style & ui.STYLE_BOLD):
             style = ui.STYLE_BOLD
         else:
             style = 0
-        color = kwargs.get('color', self.body.color)
+        color = pop(kwargs, 'color', self.body.color)
         # set new values
         if extended:
             self.body.font = (font, size, flags)
@@ -407,6 +439,9 @@ class TextWindow(Window):
         pos = self.body.get_pos()
         self.body.set(self.body.get())
         self.body.set_pos(pos)
+        if kwargs:
+            raise TypeError('TextWindow.set_style() got an unexpected keyword argument(s): %s' % \
+                ', '.join([repr(x) for x in kwargs.keys()]))
 
     def apply_settings(self):
         self.set_style(font=app.settings.editor.fontname,
@@ -417,6 +452,7 @@ class TextWindow(Window):
         self.set_shortcuts()
     
     def set_shortcuts(self):
+        Window.set_shortcuts(self)
         items = dict(self.get_shortcuts_items())
         for key, val in app.settings.editor.shortcuts.items():
             if val:
@@ -428,13 +464,6 @@ class TextWindow(Window):
                     self.set_shortcut(key, items[val])
             else:
                 self.set_shortcut(key, None)
-
-    def update_settings(cls):
-        ui.screen.rootwin.focus = True
-        for win in ui.screen.find_windows(TextWindow):
-            win.apply_settings()
-        ui.screen.rootwin.focus = False
-    update_settings = classmethod(update_settings)
 
     # returns all lines as list of (number, offset, string) tuples;
     # line numbers are counted from 1, offset is counted from start of text,
@@ -511,9 +540,8 @@ class TextWindow(Window):
                     results.append((ln, lpos, line, pos))
                     pos += len(find_text)
             if results:
-                win = ui.screen.create_window(FindResultsWindow,
-                            title=_('Find: %s') % find_text,
-                            results=results)
+                win = FindResultsWindow(title=_('Find: %s') % find_text,
+                    results=results)
                 line = win.modal(self)
                 if line:
                     self.body.set_pos(line[1] + line[3])
@@ -624,21 +652,14 @@ class TextWindow(Window):
 
 
 class FindResultsWindow(Window):
-    def __init__(self, *args, **kwargs):
-        if 'title' not in kwargs:
-            kwargs['title'] = _('Find All')
-        Window.__init__(self, *args, **kwargs)
-        self.results = kwargs['results']
+    def __init__(self, **kwargs):
+        self.results = pop(kwargs, 'results')
+        kwargs.setdefault('title', _('Find All'))
+        Window.__init__(self, **kwargs)
         self.body = ui.Listbox([(_('Line %d, Column %d') % (x[0], x[3]), x[2]) for x in self.results], self.select_click)
         self.menu = ui.Menu()
         self.menu.append(ui.MenuItem(_('Select'), target=self.select_click))
         self.menu.append(ui.MenuItem(_('Exit'), target=self.close))
-
-    def close(self):
-        r = Window.close(self)
-        if r:
-            self.menu = ui.Menu()
-        return r
 
     def select_click(self):
         self.modal_result = self.results[self.body.current()]
@@ -652,18 +673,18 @@ class TextFileWindow(TextWindow):
     session.append('main', ui.SettingsGroup())
     session.main.append('windows', ui.Setting('TextFileWindows', []))
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, **kwargs):
         try:
-            self.path = kwargs['path']
+            self.path = pop(kwargs, 'path')
         except KeyError:
             self.path = None
             self.fixed_encoding = False
             self.encoding = 'latin1'
-            TextWindow.__init__(self, *args, **kwargs)
+            TextWindow.__init__(self, **kwargs)
         else:
             text, self.encoding = self.load()
             self.fixed_encoding = True
-            TextWindow.__init__(self, *args, **kwargs)
+            TextWindow.__init__(self, **kwargs)
             self.body.set(text)
             self.body.set_pos(0)
             self.title = os.path.split(self.path)[1].decode('utf8')
@@ -785,10 +806,9 @@ class TextFileWindow(TextWindow):
         path = self.path
         if path is None:
             path = self.title.encode('utf8')
-        win = ui.screen.create_window(ui.FileBrowserWindow,
-                    mode=ui.fbmSave,
-                    path=path,
-                    title=_('Save file'))
+        win = ui.FileBrowserWindow(mode=ui.fbmSave,
+            path=path,
+            title=_('Save file'))
         path = win.modal(self)
         if path is None:
             return False
@@ -1001,7 +1021,7 @@ class PythonModifier(object):
                 from globalui import global_msg_query
                 win = None
             except ImportError:
-                win = ui.screen.create_window(AutocloseTextWindow, title=_('Call Tip'))
+                win = AutocloseTextWindow(title=_('Call Tip'))
                 menu = ui.Menu()
                 menu.append(ui.MenuItem(_('Close'), target=win.close))
                 win.menu = menu
@@ -1073,9 +1093,9 @@ class PythonModifier(object):
                 if win:
                     win.close()
                 ui.note(_('Unknown callable "%s"') % name)
-            if win and win.is_alive():
+            if win and not win.is_closed():
                 win.body.set_pos(0)
-                win.focus = True
+                win.open()
         else:
             ui.note(stdhelp)
             
@@ -1097,12 +1117,161 @@ class PythonModifier(object):
 PythonModifier.py_reset_namespace()
 
 
+class PythonCodeBrowserWindow(Window, ui.FilteredListboxModifier):
+    def __init__(self, **kwargs):
+        lines = pop(kwargs, 'lines')
+        kwargs.setdefault('title', '__main__')
+        Window.__init__(self, **kwargs)
+        ui.FilteredListboxModifier.__init__(self, _('(no match)'))
+        self.tree = self.parse_lines(lines)
+        self.set_listbox(self.make_display_list(), self.click)
+        self.menu = ui.Menu()
+        self.menu.append(ui.MenuItem(_('Select'), target=self.select_click))
+        self.menu.append(ui.MenuItem(_('Browse'), target=self.browse_click))
+        self.menu.append(ui.MenuItem(_('Back'), target=self.back_click))
+        self.menu.append(self.filter_menu_item)
+        self.menu.append(ui.MenuItem(_('Exit'), target=self.close))
+        self.keys += (ui.EKeyLeftArrow, ui.EKeyRightArrow)
+        self.stack = []
+        
+    def make_display_list(self):
+        lst = []
+        for name in self.make_list():
+            if self.tree[name][-1]:
+                name += ' ->'
+            lst.append(name)
+        if not lst:
+            lst.append(_('(no data)'))
+        return lst
+        
+    def make_list(self):
+        lst = self.tree.keys()
+        lst.sort(lambda a, b: -(a.lower() < b.lower()))
+        return lst
+
+    def key_press(self, key):
+        if key == ui.EKeyLeftArrow:
+            self.back_click()
+        elif key == ui.EKeyRightArrow:
+            self.browse_click()
+        else:
+            Window.key_press(self, key)
+            ui.FilteredListboxModifier.key_press(self, key)
+
+    def click(self):
+        i = self.current()
+        if i < 0:
+            return
+        name = self.make_list()[i]
+        try:
+            newtree = self.tree[name][-1]
+        except KeyError:
+            return
+        menu = ui.Menu()
+        menu.append(self.menu[0]) # Select
+        if newtree:
+            menu.append(self.menu[1]) # Browse
+        item = menu.popup()
+        if item is not None:
+            item.target()
+
+    def select_click(self):
+        i = self.current()
+        if i < 0:
+            return
+        name = self.make_list()[i]
+        try:
+            self.modal_result = self.tree[name][0]
+        except KeyError:
+            return
+        self.close()
+        
+    def back_click(self):
+        oldtree = self.tree
+        try:
+            self.tree = self.stack.pop()
+        except IndexError:
+            return
+        pos = [self.tree[name][-1] for name in self.make_list()].index(oldtree)
+        self.filter_title = self.filter_title[:self.title.rindex(u'.')]
+        self.set_list(self.make_display_list(), pos)
+        
+    def browse_click(self):
+        i = self.current()
+        if i < 0:
+            return
+        name = self.make_list()[i]
+        try:
+            newtree = self.tree[name][-1]
+        except KeyError:
+            return
+        if not newtree:
+            return
+        self.stack.append(self.tree)
+        self.tree = newtree
+        if name.endswith('()'):
+            name = name[:-2]
+        self.filter_title += u'.%s' % name
+        self.set_list(self.make_display_list(), 0)
+
+    # parses Python code represented by lines (as returned by TextWindow.get_lines())
+    # and returns a tree containing all classes and functions defined by this code in
+    # following format:
+    #   {name: (pos, {subname: (subpos, {})}), name2: (pos2, {})}
+    # if name ends with '()' then it is a function
+    def parse_lines(self, lines):
+        flines = []
+        idx = 0
+        for lnum, lpos, ln in lines:
+            t = ln.strip()
+            if not t:
+                continue
+            ind = ln.find(t[0])
+            flines.append((idx, ind, lpos, t))
+            idx += 1
+        end = {u'class' : u'', u'def' : u'()'}
+        last = root = {}
+        lev = [(0, root)] # indent, tree
+        for idx, ind, lpos, ln in flines:
+            t = ln.split()
+            if ind < lev[-1][0]:
+                if idx > 0:
+                    if flines[idx-1][-1][-1] in (u',', u'\\'):
+                        # current line is a continuation of previous line
+                        flines[idx] = (idx, flines[idx-1][1], lpos, ln)
+                        continue
+                    if ind < flines[idx-1][1]:
+                        pln = flines[idx-1][-1]
+                        p = max(pln.find(u"'''"), pln.find(u'"""'))
+                        if p >= 0 and p == max(pln.rfind(u"'''"), pln.rfind(u'"""')):
+                            # current line is a continuation of multiline comment
+                            flines[idx] = (idx, flines[idx-1][1], lpos, ln)
+                            continue
+                try:
+                    while ind < lev[-1][0]:
+                        lev.pop()
+                except IndexError:
+                    # error
+                    return
+            elif ind > lev[-1][0]:
+                lev.append((ind, last))
+            if t[0] in end.keys():
+                tok = t[1].split(u'(')[0].split(u':')[0]
+                name = tok+end[t[0]]
+                if name in lev[-1][1]:
+                    # duped names, append an integer
+                    name = u'%s:%d%s' % (tok, lpos+ind, end[t[0]])
+                last = {}
+                lev[-1][1][name] = (lpos+ind, last)
+        return root
+
+
 class PythonFileWindow(TextFileWindow, PythonModifier):
     type_name = 'Python'
     type_ext = '.py'
 
-    def __init__(self, *args, **kwargs):
-        TextFileWindow.__init__(self, *args, **kwargs)
+    def __init__(self, **kwargs):
+        TextFileWindow.__init__(self, **kwargs)
         PythonModifier.__init__(self)
         self.control_keys += (ui.EKeySelect,)
         self.args = u''
@@ -1234,75 +1403,12 @@ class PythonFileWindow(TextFileWindow, PythonModifier):
         self.body.set_pos(pos)
 
     def codebrowser_click(self):
-        tree = self.parse_code()
-        def tree_to_menu(tree, title=None):
-            if title is None:
-                t = _('Code Browser')
-            else:
-                t = title
-            menu = ui.Menu(t)
-            for e in tree:
-                if e.endswith(u'()'):
-                    menu.append(ui.MenuItem(e, pos=tree[e][0]))
-                    name = e[:-2]
-                else: # ends with u'.'
-                    name = e[:-1]
-                if len(tree[e][1]):
-                    if title is None:
-                        t = name
-                    else:
-                        t = title + u'.' + name
-                    menu.append(ui.MenuItem(name + u'.', submenu=tree_to_menu(tree[e][1], t)))
-            menu.sort()
-            return menu
-        item = tree_to_menu(tree).popup(full_screen=True, search_field=True)
-        if item:
-            self.body.set_pos(item.pos)
-
-    def parse_code(self):
-        lines = []
-        idx = 0
-        for lnum, lpos, ln in self.get_lines():
-            t = ln.strip()
-            if not t:
-                continue
-            ind = ln.find(t[0])
-            lines.append((idx, ind, lpos, t))
-            idx += 1
-        end = {u'class' : u'.', u'def' : u'()'}
-        last = root = {}
-        lev = [(0, root)] # indent, tree
-        for idx, ind, lpos, ln in lines:
-            t = ln.split()
-            if ind < lev[-1][0]:
-                if idx > 0:
-                    if lines[idx-1][-1][-1] in (u',', u'\\'):
-                        # current line is a continuation of previous line
-                        lines[idx] = (idx, lines[idx-1][1], lpos, ln)
-                        continue
-                    if ind < lines[idx-1][1]:
-                        pln = lines[idx-1][-1]
-                        p = max(pln.find("'''"), pln.find('"""'))
-                        if p >= 0 and p == max(pln.rfind("'''"), pln.rfind('"""')):
-                            # current line is a continuation of multiline comment
-                            lines[idx] = (idx, lines[idx-1][1], lpos, ln)
-                            continue
-                try:
-                    while ind < lev[-1][0]:
-                        lev.pop()
-                except IndexError:
-                    # error
-                    return
-            elif ind > lev[-1][0]:
-                lev.append((ind, last))
-            if t[0] in end.keys():
-                tok = t[1].split(u'(')[0].split(u':')[0]
-                name = tok + end[t[0]]
-                if name in lev[-1][1]:
-                    name = u'%s/%d%s' % (tok, lpos + ind, end[t[0]])
-                last = {}
-                lev[-1][1][name] = (lpos + ind, last)
-        return root
+        name = os.path.splitext(self.title)[0]
+        win = PythonCodeBrowserWindow(title=name,
+            lines=self.get_lines())
+        pos = win.modal(self)
+        if pos is not None:
+            self.body.set_pos(pos)
 
     def set_shortcuts(self):
         TextFileWindow.set_shortcuts(self)
@@ -1320,8 +1426,8 @@ class PythonFileWindow(TextFileWindow, PythonModifier):
 
 
 class IOWindow(TextWindow):
-    def __init__(self, *args, **kwargs):
-        TextWindow.__init__(self, *args, **kwargs)
+    def __init__(self, **kwargs):
+        TextWindow.__init__(self, **kwargs)
         self.control_keys += (ui.EKeyBackspace,)
         self.event = None
         self.locked = None
@@ -1452,10 +1558,9 @@ class IOWindow(TextWindow):
 
 
 class PythonShellWindow(IOWindow, PythonModifier):
-    def __init__(self, *args, **kwargs):
-        if 'title' not in kwargs:
-            kwargs['title'] = _('Python Shell')
-        IOWindow.__init__(self, *args, **kwargs)
+    def __init__(self, **kwargs):
+        kwargs.setdefault('title', _('Python Shell'))
+        IOWindow.__init__(self, **kwargs)
         PythonModifier.__init__(self)
         self.control_keys += (ui.EKeyUpArrow, ui.EKeyDownArrow,
                               ui.EKeyBackspace, ui.EKeySelect)
@@ -1672,9 +1777,8 @@ class PythonShellWindow(IOWindow, PythonModifier):
     def history_click(self):
         if self.is_busy():
             return
-        win = ui.screen.create_window(HistoryWindow,
-                    history=self.history,
-                    ptr=self.history_ptr)
+        win = HistoryWindow(history=self.history,
+            ptr=self.history_ptr)
         ptr = win.modal(self)
         if ptr is not None:
             self.history_ptr = ptr
@@ -1684,10 +1788,9 @@ class PythonShellWindow(IOWindow, PythonModifier):
             self.write('\n'.join(statement))
 
     def export_click(self):
-        win = ui.screen.create_window(ui.FileBrowserWindow,
-                    mode=ui.fbmSave,
-                    path='PythonShell.txt',
-                    title=_('Export to'))
+        win = ui.FileBrowserWindow(mode=ui.fbmSave,
+            path='PythonShell.txt',
+            title=_('Export to'))
         path = win.modal(self)
         if path is None:
             return
@@ -1714,26 +1817,16 @@ class PythonShellWindow(IOWindow, PythonModifier):
 
 
 class HistoryWindow(Window):
-    def __init__(self, *args, **kwargs):
-        if 'title' not in kwargs:
-            kwargs['title'] = _('History')
-        Window.__init__(self, *args, **kwargs)
-        self.history = kwargs['history']
-        try:
-            ptr = kwargs['ptr']
-        except KeyError:
-            ptr = 0
+    def __init__(self, **kwargs):
+        self.history = pop(kwargs, 'history')
+        ptr = pop(kwargs, 'ptr', 0)
+        kwargs.setdefault('title', _('History'))
+        Window.__init__(self, **kwargs)
         self.body = ui.Listbox([u''], self.select_click)
         self.body.set_list(['; '.join(filter(None, [y.strip() for y in x])).replace(':;', ':') for x in self.history], ptr)
         self.menu = ui.Menu()
         self.menu.append(ui.MenuItem(_('Select'), target=self.select_click))
         self.menu.append(ui.MenuItem(_('Exit'), target=self.close))
-
-    def close(self):
-        r = Window.close(self)
-        if r:
-            self.menu = ui.Menu()
-        return r
 
     def select_click(self):
         self.modal_result = self.body.current()
@@ -1741,16 +1834,19 @@ class HistoryWindow(Window):
 
 
 class HelpWindow(TextWindow):
-    def __init__(self, *args, **kwargs):
-        if 'title' not in kwargs:
-            kwargs['title'] = _('Help')
-        TextWindow.__init__(self, *args, **kwargs)
-        if 'text' in kwargs:
-            text = unicode(kwargs['text'])
-        else:
-            f = file(kwargs['path'], 'r')
+    def __init__(self, **kwargs):
+        text = pop(kwargs, 'text', None)
+        path = pop(kwargs, 'path', None)
+        kwargs.setdefault('title', _('Help'))
+        TextWindow.__init__(self, **kwargs)
+        if text is not None:
+            text = unicode(text)
+        elif path is not None:
+            f = file(path, 'r')
             text = f.read().decode('utf8')
             f.close()
+        else:
+            raise TypeError('specify either \'text\' or \'path\' arguments')
         self.body.set(text)
         self.body.set_pos(0)
 
@@ -1786,13 +1882,13 @@ class StdIOWrapper(object):
     def shell(cls):
         self = cls.singleton
         assert self, 'StdIOWrapper must be instatinated first'
-        if self.win and self.win.is_alive():
+        if self.win and self.win.is_opened():
             self.win.focus = True
             return self.win
         try:
-            ui.screen.create_blank_window(_('Please wait...'))
-            self.win = ui.screen.create_window(PythonShellWindow)
-            self.win.focus = True
+            ui.screen.open_blank_window(_('Please wait...'))
+            self.win = PythonShellWindow()
+            self.win.open()
             return self.win
         except:
             # ui module failed, display the error using appuifw functions directly
@@ -1822,10 +1918,9 @@ class StdIOWrapper(object):
 
 
 class PluginsWindow(Window):
-    def __init__(self, *args, **kwargs):
-        if 'title' not in kwargs:
-            kwargs['title'] = _('Plugins')
-        ui.Window.__init__(self, *args, **kwargs)
+    def __init__(self, **kwargs):
+        kwargs.setdefault('title', _('Plugins'))
+        Window.__init__(self, **kwargs)
         self.plugins_path = os.path.join(app.path, 'plugins')
         self.body = ui.Listbox([(u'', u'')], self.select_click)
         self.body.bind(ui.EKeyBackspace, self.uninstall_click)
@@ -1846,35 +1941,32 @@ class PluginsWindow(Window):
 
     def update(self):
         plugins = []
+        started = app.started_plugins.copy()
         if os.path.exists(self.plugins_path):
             for name in os.listdir(self.plugins_path):
                 path = os.path.join(self.plugins_path, name)
                 try:
-                    plugins.append((path, name,
-                        Manifest(os.path.join(path, 'manifest.txt'))))
+                    manifest = Manifest(os.path.join(path, 'manifest.txt'))
                 except IOError:
                     continue
+                plugins.append((path, name, manifest))
+                if started.get(name, None) == (manifest['name'], manifest['version']):
+                    del started[name]
+        for name, info in started.items():
+            plugins.append(('', name, {'name': info[0], 'version': info[1]}))
+        plugins.sort(lambda a, b: \
+            -(a[2]['name'].lower()+a[2]['version'] < \
+            b[2]['name'].lower()+b[2]['version']))
         lst = []
-        started = app.started_plugins.copy()
         for path, name, manifest in plugins:
-            if name in started and \
-                    started[name] in (None, (manifest['name'], manifest['version'])):
-                app.started_plugins[name] = (manifest['name'], manifest['version'])
-                del started[name]
+            if not path:
+                descr = _('Uninstalled. Restart to stop.')
+            elif name in app.started_plugins:
                 descr = _('Running.')
             else:
-                # freshly installed, not yet in app.started_plugins
                 descr = _('Installed. Restart Ped to run.')
             lst.append((u'%s %s' % (manifest['name'], manifest['version']), descr))
-        for name, info in started.items():
-            if info is None:
-                info = (name.decode('utf8'), u'')
-            lst.append((u'%s %s' % info, _('Uninstalled. Restart to stop.')))
-            plugins.append(('', name, {'name': info[0], 'version': info[1]}))
-        if plugins:
-            plugins.sort(lambda a, b: \
-                -(a[2]['name'].lower()+a[2]['version'] < \
-                b[2]['name'].lower()+b[2]['version']))
+        if [name for path, name, manifest in plugins if path]:
             self.menu = self.menu_plugins
             self.popup_menu = self.popup_menu_plugins
         else:
@@ -1898,25 +1990,23 @@ class PluginsWindow(Window):
         except IndexError:
             ui.note(_('Not available'))
             return
-        bwin = ui.screen.create_blank_window(_('Please wait...'))
+        bwin = ui.screen.open_blank_window(_('Please wait...'))
         path = os.path.join(path, 'help')
         helpfile = os.path.join(path, app.language.encode('utf8'))
         if not os.path.exists(helpfile):
             helpfile = os.path.join(path, 'English')
         try:
-            win = ui.screen.create_window(HelpWindow,
-                    path=helpfile,
-                    title=_('Help for %s') % manifest['name'])
+            win = HelpWindow(path=helpfile,
+                title=_('Help for %s') % manifest['name'])
             win.body.add((u'%s\n' + _('Version: %s') + u'\n\n') % (manifest['name'], manifest['version']))
             win.body.set_pos(0)
-            win.focus = True
+            win.open()
         except IOError:
             ui.note(_('Cannot load help file'))
             bwin.close()
 
     def install_click(self):
-        win = ui.screen.create_window(ui.FileBrowserWindow,
-            title=_('Install plugin'),
+        win = ui.FileBrowserWindow(title=_('Install plugin'),
             filter_ext=('.zip',))
         path = win.modal(self)
         if path:
@@ -1941,14 +2031,14 @@ class PluginsWindow(Window):
         z = zipfile.ZipFile(filename)
         lst = [x.lower() for x in z.namelist()]
         # plugin must contain the manifest and default python files
-        if 'manifest.txt' not in lst or ('default.py' not in lst and 'default.pyc' not in lst):
+        if 'manifest.txt' not in lst or ('__init__.py' not in lst and '__init__.pyc' not in lst):
             ui.note(_('Not a plugin file'), 'error')
             return
         # parse manifest and check mandatory fields
         dct = dict([(x.lower(), x) for x in z.namelist()])
         manifest = Manifest()
         manifest.parse(z.read(dct['manifest.txt']))
-        for field in ('folder', 'name', 'version', 'ped-version-min', 'ped-version-max'):
+        for field in ('package', 'name', 'version', 'ped-version-min', 'ped-version-max'):
             if field not in manifest:
                 ui.note(_('%s field missing from manifest') % field.capitalize())
                 return
@@ -1963,10 +2053,7 @@ class PluginsWindow(Window):
                 return
             # increase version range to stop Ped from complaining upon startup
             manifest['ped-version-max'] = pedver
-        # create plugins directory if needed
-        if not os.path.exists(self.plugins_path):
-            os.mkdir(self.plugins_path)
-        path = os.path.join(self.plugins_path, manifest['folder'])
+        path = os.path.join(self.plugins_path, manifest['package'])
         if os.path.exists(path):
             try:
                 old_manifest = Manifest(os.path.join(path, 'manifest.txt'))
@@ -2074,6 +2161,7 @@ class Application(object):
         settings.main.append('language', ui.ChoiceSetting(_('Language'), u'English', alllanguages))
         settings.main.append('encoding', ui.ChoiceSetting(_('Default encoding'), 'utf-8', ('ascii', 'latin-1', 'utf-8', 'utf-16')))
         settings.main.append('autosave', ui.ChoiceValueSetting(_('Autosave'), 0, ((_('Off'), 0), (_('%d sec') % 30, 30), (_('%d min') % 1, 60), (_('%d min') % 2, 120), (_('%d min') % 5, 300), (_('%d min') % 10, 600))))
+        settings.main.append('shortcuts', ShortcutsGroupSetting(_('Default shortcuts'), RootWindow))
         settings.editor.append('fontname', ui.ChoiceSetting(_('Font'), defaultfont, allfonts))
         settings.editor.append('fontsize', ui.IntegerSetting(_('Font size'), 12))
         settings.editor.append('fontantialias', ui.BoolSetting(_('Font anti-aliasing'), True))
@@ -2082,7 +2170,7 @@ class Application(object):
         settings.editor.append('pagesizenorm', ui.IntegerSetting(_('Page size, normal'), 8, vmin=1, vmax=64))
         settings.editor.append('pagesizefull', ui.IntegerSetting(_('Page size, full screen'), 11, vmin=1, vmax=64))
         settings.editor.append('pagesizeland', ui.IntegerSetting(_('Page size, landscape'), 9, vmin=1, vmax=64))
-        settings.editor.append('shortcuts', ShortcutsGroupSetting(_('Default shortcuts'), TextFileWindow))
+        settings.editor.append('shortcuts', ShortcutsGroupSetting(_('Shortcuts'), TextFileWindow))
         settings.python.append('askforargs', ui.BoolSetting(_('Ask for arguments'), False))
         settings.python.append('shellcolor', ui.ChoiceValueSetting(_('Shell text color'), 0x008800, allcolors))
         settings.python.append('indent', ui.IntegerSetting(_('Indentation size'), 4, vmin=1, vmax=8))
@@ -2148,8 +2236,13 @@ class Application(object):
             if os.path.exists(path):
                 sys.path.append(path)
 
-        # create root ui window (desktop)
-        rootwin = ui.screen.create_window(RootWindow)
+        # load and apply settings
+        self.settings.load_if_available()
+        self.apply_settings()
+
+        # open root ui window (desktop)
+        rootwin = RootWindow()
+        rootwin.open()
 
         # setup main menu
         file_menu = ui.Menu(_('File'))
@@ -2168,10 +2261,6 @@ class Application(object):
         main_menu.append(ui.MenuItem(_('Tools'), submenu=tools_menu))
         main_menu.append(ui.MenuItem(_('Exit'), target=self.exit_click))
         rootwin.menu = main_menu
-
-        # load and apply settings
-        self.settings.load_if_available()
-        self.apply_settings()
 
         # start plugins
         ui.schedule(self.start_plugins)
@@ -2197,9 +2286,8 @@ class Application(object):
                         klass = file_windows_types[[x.type_ext.lower() for x in file_windows_types].index(ext)]
                     except ValueError:
                         klass = TextFileWindow
-                    ui.screen.create_blank_window(_('Please wait...'))
-                    win = ui.screen.create_window(klass,
-                        title=os.path.split(path)[1].decode('utf8'))
+                    ui.screen.open_blank_window(_('Please wait...'))
+                    win = klass(title=os.path.split(path)[1].decode('utf8'))
                     if win:
                         win.body.set(text)
                         win.body.set_pos(pos)
@@ -2209,7 +2297,7 @@ class Application(object):
                             win.fixed_encoding = True
                         else:
                             win.fixed_encoding = False
-                        win.focus = True
+                        win.open()
         del windows[:]
         try:
             TextFileWindow.session.save()
@@ -2219,15 +2307,17 @@ class Application(object):
     def start_plugins(self):
         plugins_path = os.path.join(self.path, 'plugins')
         self.started_plugins = {}
-        if os.path.exists(plugins_path):
-            slen = len(self.settings.allkeys())
-            for name in os.listdir(plugins_path):
-                path = os.path.join(plugins_path, name)
-                # load manifest
-                try:
-                    manifest = Manifest(os.path.join(path, 'manifest.txt'))
-                except IOError:
-                    continue
+        slen = len(self.settings.allkeys())
+
+        for name in os.listdir(plugins_path):
+            path = os.path.join(plugins_path, name)
+            if not os.path.isdir(path):
+                continue
+
+            # load manifest
+            try:
+                manifest = Manifest(os.path.join(path, 'manifest.txt'))
+
                 # check version
                 pedver = __version__.split()[0]
                 if manifest['ped-version-min'] > pedver:
@@ -2240,48 +2330,22 @@ class Application(object):
                         continue
                     manifest['ped-version-max'] = pedver
                     manifest.save(os.path.join(path, 'manifest.txt'))
-                t1 = os.path.join(path, 'default.py')
-                t2 = os.path.join(path, 'default.pyc')
-                try:
-                    m1 = os.path.getmtime(t1)
-                except OSError:
-                    m1 = 0.0
-                try:
-                    m2 = os.path.getmtime(t2)
-                except OSError:
-                    m2 = 0.0
-                if m2 > m1:
-                    filename = t2
-                else:
-                    filename = t1
-                # list() will make copies so we will be able to restore these later
-                mysys = list(sys.argv), list(sys.path)
-                sys.path.insert(0, os.path.split(filename)[0])
-                sys.argv = [filename]
-                try:
-                    import __main__
-                    ns = {}
-                    ns.update(__main__.__dict__)
-                    ns.update(__main__.__builtins__.__dict__)
-                    ns['__name__'] = '__main__'
-                    ns['__file__'] = filename
-                    ns['__plugin__'] = name
-                    ns['_'] = translator = ui.Translator()
-                    ns['repattr'] = repattr
-                    execfile(filename, ns)
-                    translator.load_if_available(os.path.join(path, 'lang\\' + self.language))
-                    self.started_plugins[name] = None
-                except:
-                    from traceback import print_exc
-                    print_exc()
-                    ui.note(_('Starting %s plugin failed, skipping') % name.decode('utf8'), 'error')
-                sys.argv, sys.path = mysys
-            if len(self.settings.allkeys()) != slen:
-                # plugins have added/removed the settings;
-                # reload so the new settings are loaded too
-                self.settings.load_if_available()
-                self.apply_settings()
-            ui.screen.redraw()
+
+                __import__('plugins.%s' % name)
+                self.started_plugins[name] = (manifest['name'], manifest['version'])
+
+            except:
+                from traceback import print_exc
+                print_exc()
+                ui.note(_('Starting "%s" plugin failed, skipping') % name.decode('utf8'), 'error')
+
+        if len(self.settings.allkeys()) != slen:
+            # plugins have added/removed the settings;
+            # reload so the new settings are loaded too
+            self.settings.load_if_available()
+            self.apply_settings()
+
+        ui.screen.redraw()
     
     def exit_click(self):
         if ui.screen.find_windows(TextFileWindow):
@@ -2300,9 +2364,8 @@ class Application(object):
     def new_file(self, klass):
         title = 'Unnamed%d%s' % (self.unnamed_count, klass.type_ext)
         self.unnamed_count += 1
-        win = ui.screen.create_window(klass,
-                title=title)
-        win.focus = True
+        win = klass(title=title)
+        win.open()
         return win
 
     def settings_click(self):
@@ -2310,29 +2373,28 @@ class Application(object):
             self.apply_settings()
 
     def apply_settings(self):
-        TextWindow.update_settings()
+        GlobalWindowModifier.update_settings()
         if self.language != self.settings.main.language.encode('utf8'):
             ui.note(_('Restart Ped for the changes to take effect'))
 
     def plugins_click(self):
-        if self.plugins_win and self.plugins_win.is_alive():
+        if self.plugins_win and self.plugins_win.is_opened():
             self.plugins_win.focus = True
             return
-        self.plugins_win = ui.screen.create_window(PluginsWindow)
-        self.plugins_win.focus = True
+        self.plugins_win = PluginsWindow()
+        self.plugins_win.open()
 
     def help_click(self):
-        if self.help_win and self.help_win.is_alive():
+        if self.help_win and self.help_win.is_opened():
             self.help_win.focus = True
             return
-        bwin = ui.screen.create_blank_window(_('Please wait...'))
+        bwin = ui.screen.open_blank_window(_('Please wait...'))
         path = os.path.join(self.path, 'lang\\help')
         helpfile = os.path.join(path, self.language)
         if not os.path.exists(helpfile):
             helpfile = os.path.join(path, 'English')
         try:
-            self.help_win = ui.screen.create_window(HelpWindow,
-                    path=helpfile)
+            self.help_win = HelpWindow(path=helpfile)
             self.help_win.body.add(u'Ped - Python IDE\n'
                                    u'Version: %s\n'
                                    u'\n'
@@ -2340,7 +2402,7 @@ class Application(object):
                                    u'<arkadiusz.wahlig@gmail.com>\n'
                                    u'\n' % __version__)
             self.help_win.body.set_pos(0)
-            self.help_win.focus = True
+            self.help_win.open()
         except IOError:
             ui.note(_('Cannot load help file'), 'error')
             bwin.close()
@@ -2357,8 +2419,7 @@ class Application(object):
         if self.browser_win:
             ui.note(_('File browser already in use'), 'error')
             return
-        self.browser_win = ui.screen.create_window(ui.FileBrowserWindow,
-                title=_('Open file'))
+        self.browser_win = ui.FileBrowserWindow(title=_('Open file'))
         path = self.browser_win.modal()
         self.browser_win = None
         if not path:
@@ -2376,11 +2437,10 @@ class Application(object):
             klass = file_windows_types[[x.type_ext.lower() for x in file_windows_types].index(ext)]
         except ValueError:
             klass = TextFileWindow
-        wwin = ui.screen.create_blank_window(_('Please wait...'))
+        wwin = ui.screen.open_blank_window(_('Please wait...'))
         try:
-            win = ui.screen.create_window(klass,
-                    path=path)
-            win.focus = True
+            win = klass(path=path)
+            win.open()
         except IOError:
             win = None
             ui.note(_('Cannot load %s file') % os.path.split(path)[1], 'error')
@@ -2391,8 +2451,7 @@ class Application(object):
         if self.browser_win:
             ui.note(_('File browser already in use'), 'error')
             return
-        self.browser_win = ui.screen.create_window(ui.FileBrowserWindow,
-                title=_('Run script'))
+        self.browser_win = ui.FileBrowserWindow(title=_('Run script'))
         path = self.browser_win.modal()
         self.browser_win = None
         if not path:
@@ -2635,10 +2694,24 @@ def quote_split(s):
 
 
 def repattr(obj, name, value):
-    '''Sets an attribute of a class/object. Returns the old value.'''
+    '''Sets an attribute of a class/object. Returns the old value.
+    '''
     old = getattr(obj, name)
     setattr(obj, name, value)
     return old
+    
+    
+def get_plugin_translator(plugin_path):
+    '''Returns a new ui.Translator object for plugin specified
+    by plugin_path argument. If a file is passed, the last
+    path component is removed.
+    '''
+    if os.path.isfile(plugin_path):
+        plugin_path = os.path.split(plugin_path)[0]
+    path = os.path.join(plugin_path, 'lang\\' + app.language)
+    trans = ui.Translator()
+    translator.load_if_available(path)
+    return trans
 
 
 # i18n object
