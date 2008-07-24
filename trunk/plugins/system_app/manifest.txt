@@ -1,4 +1,4 @@
-Folder: system_app
+Package: system_app
 Name: System App
 Version: 1.00.1
 Ped-Version-Min: 2.30.4
