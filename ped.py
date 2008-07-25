@@ -1158,11 +1158,20 @@ class PythonCodeBrowserWindow(Window, ui.FilteredListboxModifier):
             Window.key_press(self, key)
             ui.FilteredListboxModifier.key_press(self, key)
 
-    def click(self):
+    def current_name(self):
         i = self.current()
         if i < 0:
             return
-        name = self.make_list()[i]
+        lst = self.make_list()
+        try:
+            return lst[i]
+        except IndexError:
+            return
+
+    def click(self):
+        name = self.current_name()
+        if name is None:
+            return
         try:
             newtree = self.tree[name][-1]
         except KeyError:
@@ -1176,10 +1185,9 @@ class PythonCodeBrowserWindow(Window, ui.FilteredListboxModifier):
             item.target()
 
     def select_click(self):
-        i = self.current()
-        if i < 0:
+        name = self.current_name()
+        if name is None:
             return
-        name = self.make_list()[i]
         try:
             self.modal_result = self.tree[name][0]
         except KeyError:
@@ -1197,10 +1205,9 @@ class PythonCodeBrowserWindow(Window, ui.FilteredListboxModifier):
         self.set_list(self.make_display_list(), pos)
         
     def browse_click(self):
-        i = self.current()
-        if i < 0:
+        name = self.current_name()
+        if name is None:
             return
-        name = self.make_list()[i]
         try:
             newtree = self.tree[name][-1]
         except KeyError:
@@ -1661,6 +1668,7 @@ class PythonShellWindow(IOWindow, PythonModifier):
     def get_shortcuts(cls):
         menu = IOWindow.get_shortcuts()
         menu.extend(PythonModifier.get_shortcuts())
+        menu.append(ui.MenuItem(_('Clear'), method=cls.clear_click))
         return menu
     get_shortcuts = classmethod(get_shortcuts)
 

@@ -1557,7 +1557,7 @@ class GroupSettingWindow(Window):
         self.body = Listbox(self.get_list(), self.change_click)
         self.menu.append(MenuItem(_('Add'), target=self.add_click))
         self.menu.append(MenuItem(_('Change'), target=self.change_click))
-        self.menu.append(MenuItem(_('Remove'), target=self.remove_click))
+        self.menu.append(MenuItem(_('Delete'), target=self.delete_click))
         self.menu.append(MenuItem(_('Exit'), target=self.close))
         self.keys += (EKeyBackspace,)
         self.modal_result = False
@@ -1597,7 +1597,7 @@ class GroupSettingWindow(Window):
                     self.body.set_list(self.get_list(), i)
                     self.modal_result = True
 
-    def remove_click(self):
+    def delete_click(self):
         try:
             name, setting = self.setting.value.items()[self.body.current()]
         except IndexError:
