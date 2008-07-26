@@ -1601,7 +1601,7 @@ class GroupSettingWindow(Window):
         try:
             name, setting = self.setting.value.items()[self.body.current()]
         except IndexError:
-            note(_('Nothing to remove'))
+            note(_('Nothing to delete'))
             return
         title = self.setting.to_item(setting)
         if isinstance(title, tuple):

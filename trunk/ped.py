@@ -297,9 +297,7 @@ class Window(ui.Window, GlobalWindowModifier):
         ui.Window.__init__(self, **kwargs)
         GlobalWindowModifier.__init__(self)
         try:
-            menu = ui.screen.rootwin.menu.copy()
-            self.init_menu(menu)
-            self.menu = menu
+            self.menu = ui.screen.rootwin.menu.copy()
         except AttributeError:
             # in case shell is opened to display an error while Ped is closing
             pass
@@ -307,9 +305,6 @@ class Window(ui.Window, GlobalWindowModifier):
     def open(self, focus=True):
         GlobalWindowModifier.open(self)
         ui.Window.open(self, focus)
-
-    def init_menu(self, menu):
-        pass
 
     def focus_changed(self, focus):
         GlobalWindowModifier.focus_changed(self, focus)
@@ -329,8 +324,6 @@ class TextWindow(Window):
         self.keys += (ui.EKeyEnter, ui.EKeySelect, ui.EKeyHome)
         self.control_keys += (ui.EKeyLeftArrow, ui.EKeyRightArrow,
                               ui.EKeyUpArrow, ui.EKeyDownArrow, ui.EKeyEdit)
-
-    def init_menu(self, menu):
         edit_menu = ui.Menu(_('Edit'))
         edit_menu.append(ui.MenuItem(_('Find...'), target=self.find_click))
         edit_menu.append(ui.MenuItem(_('Find Next'), target=self.findnext_click))
@@ -340,14 +333,14 @@ class TextWindow(Window):
         edit_menu.append(ui.MenuItem(_('Bottom'), target=self.move_end_of_document))
         edit_item = ui.MenuItem(_('Edit'), submenu=edit_menu)
         try:
-            file_item = menu.find(title=_('File'))[0]
+            file_item = self.menu.find(title=_('File'))[0]
         except IndexError:
-            menu.insert(0, edit_item)
+            self.menu.insert(0, edit_item)
         else:
-            menu.insert(menu.index(file_item)+1, edit_item)
+            self.menu.insert(self.menu.index(file_item)+1, edit_item)
         fullscreen_item = ui.MenuItem(_('Full Screen'), target=self.fullscreen_click)
         try:
-            tools_menu = menu.find(title=_('Tools'))[0].submenu
+            tools_menu = self.menu.find(title=_('Tools'))[0].submenu
         except IndexError:
             # shouldn't happen but what the heck :)
             edit_menu.append(fullscreen_item)
@@ -689,6 +682,12 @@ class TextFileWindow(TextWindow):
             self.body.set_pos(0)
             self.title = os.path.split(self.path)[1].decode('utf8')
         self.autosave_timer = e32.Ao_timer()
+        file_menu = self.menu.find(title=_('File'))[0].submenu
+        file_menu.append(ui.MenuItem(_('Save'), target=self.save))
+        file_menu.append(ui.MenuItem(_('Save As...'), target=self.save_as))
+        file_menu.append(ui.MenuItem(_('Save All'), target=self.save_all))
+        file_menu.append(ui.MenuItem(_('Close'), target=self.close))
+        file_menu.append(ui.MenuItem(_('Close All'), target=self.close_all))
 
     def apply_settings(self):
         TextWindow.apply_settings(self)
@@ -731,15 +730,6 @@ class TextFileWindow(TextWindow):
             self.autosave_timer.cancel()
             return True
         return False
-
-    def init_menu(self, menu):
-        TextWindow.init_menu(self, menu)
-        file_menu = menu.find(title=_('File'))[0].submenu
-        file_menu.append(ui.MenuItem(_('Save'), target=self.save))
-        file_menu.append(ui.MenuItem(_('Save As...'), target=self.save_as))
-        file_menu.append(ui.MenuItem(_('Save All'), target=self.save_all))
-        file_menu.append(ui.MenuItem(_('Close'), target=self.close))
-        file_menu.append(ui.MenuItem(_('Close All'), target=self.close_all))
 
     def get_shortcuts(cls):
         menu = TextWindow.get_shortcuts()
@@ -868,6 +858,10 @@ class AutocloseTextWindow(TextWindow):
 
 class PythonModifier(object):
     py_namespace = {}
+
+    def __init__(self):
+        edit_menu = self.menu.find(title=_('Edit'))[0].submenu
+        edit_menu.append(ui.MenuItem(_('Call Tip'), target=self.py_calltip))
 
     def py_reset_namespace(cls):
         import __main__
@@ -1102,10 +1096,6 @@ class PythonModifier(object):
     def py_calltip_scheduled(self):
         ui.schedule(self.py_calltip)
 
-    def init_menu(self, menu):
-        edit_menu = menu.find(title=_('Edit'))[0].submenu
-        edit_menu.append(ui.MenuItem(_('Call Tip'), target=self.py_calltip))
-
     def get_shortcuts(cls):
         menu = ui.Menu()
         menu.append(ui.MenuItem(_('Call Tip'), method=cls.py_calltip_scheduled))
@@ -1282,12 +1272,8 @@ class PythonFileWindow(TextFileWindow, PythonModifier):
         PythonModifier.__init__(self)
         self.control_keys += (ui.EKeySelect,)
         self.args = u''
-
-    def init_menu(self, menu):
-        TextFileWindow.init_menu(self, menu)
-        PythonModifier.init_menu(self, menu)
-        menu.insert(0, ui.MenuItem(_('Run'), target=self.run_click))
-        edit_menu = menu.find(title=_('Edit'))[0].submenu
+        self.menu.insert(0, ui.MenuItem(_('Run'), target=self.run_click))
+        edit_menu = self.menu.find(title=_('Edit'))[0].submenu
         edit_menu.append(ui.MenuItem(_('Code Browser'), target=self.codebrowser_click))
 
     def enter_key_press(self):
@@ -1571,6 +1557,13 @@ class PythonShellWindow(IOWindow, PythonModifier):
         PythonModifier.__init__(self)
         self.control_keys += (ui.EKeyUpArrow, ui.EKeyDownArrow,
                               ui.EKeyBackspace, ui.EKeySelect)
+        
+        self.menu.insert(0, ui.MenuItem(_('History'), target=self.history_click))
+        file_menu = self.menu.find(title=_('File'))[0].submenu
+        file_menu.append(ui.MenuItem(_('Export To...'), target=self.export_click))
+        edit_menu = self.menu.find(title=_('Edit'))[0].submenu
+        edit_menu.append(ui.MenuItem(_('Clear'), target=self.clear_click))
+
         self.old_stdio = sys.stdin, sys.stdout, sys.stderr
         sys.stdin = sys.stdout = sys.stderr = self
         self.write('Python %s on %s\n' \
@@ -1607,15 +1600,6 @@ class PythonShellWindow(IOWindow, PythonModifier):
         if r:
             sys.stdin, sys.stdout, sys.stderr = self.old_stdio
         return r
-
-    def init_menu(self, menu):
-        IOWindow.init_menu(self, menu)
-        PythonModifier.init_menu(self, menu)
-        menu.insert(0, ui.MenuItem(_('History'), target=self.history_click))
-        file_menu = menu.find(title=_('File'))[0].submenu
-        file_menu.append(ui.MenuItem(_('Export To...'), target=self.export_click))
-        edit_menu = menu.find(title=_('Edit'))[0].submenu
-        edit_menu.append(ui.MenuItem(_('Clear'), target=self.clear_click))
 
     def control_key_press(self, key):
         if key in (ui.EKeyUpArrow, ui.EKeyDownArrow):
@@ -1845,6 +1829,8 @@ class HelpWindow(TextWindow):
     def __init__(self, **kwargs):
         text = pop(kwargs, 'text', None)
         path = pop(kwargs, 'path', None)
+        head = pop(kwargs, 'head', u'')
+        tail = pop(kwargs, 'tail', u'')
         kwargs.setdefault('title', _('Help'))
         TextWindow.__init__(self, **kwargs)
         if text is not None:
@@ -1855,28 +1841,73 @@ class HelpWindow(TextWindow):
             f.close()
         else:
             raise TypeError('specify either \'text\' or \'path\' arguments')
-        self.body.set(text)
+        self.menu.insert(0, ui.MenuItem(_('Topic List'), target=self.topics_click))
+        self.history = []
+        text = ''.join((head, text, tail))
+        self.topics = ui.Menu(_('Topic List'))
+        stack = []
+        for ln in text.splitlines(True):
+            if ln.startswith('$'): # topic
+                title = ln.lstrip('$')
+                level = len(ln)-len(title)
+                title = title.strip()
+                if level > len(stack):
+                    stack.extend(['0']*(level-len(stack)))
+                else:
+                    stack = stack[:level]
+                stack[-1] = str(int(stack[-1])+1)
+                chapter = u'.'.join(stack)
+                chaptit = u'%s. %s' % (chapter, title)
+                self.topics.append(ui.MenuItem(chaptit, chapter=chapter,
+                    topic=title, pos=self.body.get_pos()))
+                ln = u'%s\n' % chaptit
+            self.body.add(ln)
         self.body.set_pos(0)
 
-    def init_menu(self, menu):
-        TextWindow.init_menu(self, menu)
-        menu.insert(0, ui.MenuItem(_('Topic List'), target=self.topics_click))
+    def add_to_history(self, pos=None):
+        if pos is None:
+            pos = self.body.get_pos()
+        if not self.history:
+            self.menu.insert(0, ui.MenuItem(_('Back'), target=self.back_click))
+            self.update_menu()
+        self.history.append(pos)
+
+    def enter_key_press(self):
+        pos = self.body.get_pos()-1
+        self.body.delete(pos, 1)
+        lnum, offset, ln = self.get_line_from_pos(pos)
+        pos -= offset
+        br1 = ln.rfind(u'[', 0, pos)
+        br2 = ln.find(u']', pos)
+        if br1 >= 0 and br2 > 0:
+            link = ln[br1+1:br2]
+            items = self.topics.find(topic=link)
+            if not items:
+                items = self.topics.find(chapter=link)
+                if not items:
+                    items = self.topics.find(title=link)
+            if items:
+                self.add_to_history()
+                self.body.set_pos(items[0].pos)
 
     def topics_click(self):
-        def istopic((ln, lpos, line)):
-            i = line.find(u' ')
-            if i < 0:
-                return False
-            for c in line[:i]:
-                if not (c.isdigit() or c == u'.'):
-                    return False
-            return True
-        menu = ui.Menu(_('Topic List'))
-        for ln, lpos, topic in filter(istopic, self.get_lines()):
-            menu.append(ui.MenuItem(topic, line=ln, pos=lpos))
-        item = menu.popup(search_field=True)
+        item = self.topics.popup(search_field=True)
         if item:
+            self.add_to_history()
             self.body.set_pos(item.pos)
+            
+    def back_click(self):
+        try:
+            pos = self.history.pop()
+        except IndexError:
+            pass
+        else:
+            self.body.set_pos(pos)
+        if not self.history:
+            items = self.menu.find(title=_('Back'))
+            if items:
+                self.menu.remove(items[0])
+                self.update_menu()
 
 
 class StdIOWrapper(object):
@@ -2402,14 +2433,13 @@ class Application(object):
         if not os.path.exists(helpfile):
             helpfile = os.path.join(path, 'English')
         try:
-            self.help_win = HelpWindow(path=helpfile)
-            self.help_win.body.add(u'Ped - Python IDE\n'
-                                   u'Version: %s\n'
-                                   u'\n'
-                                   u'Copyright \u00a9 2007-2008\nArkadiusz Wahlig\n'
-                                   u'<arkadiusz.wahlig@gmail.com>\n'
-                                   u'\n' % __version__)
-            self.help_win.body.set_pos(0)
+            self.help_win = HelpWindow(path=helpfile,
+                head=u'Ped - Python IDE\n'
+                     u'Version: %s\n'
+                     u'\n'
+                     u'Copyright \u00a9 2007-2008\nArkadiusz Wahlig\n'
+                     u'<arkadiusz.wahlig@gmail.com>\n'
+                     u'\n' % __version__)
             self.help_win.open()
         except IOError:
             ui.note(_('Cannot load help file'), 'error')
