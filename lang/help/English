@@ -1,162 +1,148 @@
 User's Guide
 
-1. Disclaimer
+$ Disclaimer
 
-Ped is distributed under the terms of the BSD License. See the included LICENSE file for more information.
+Ped is distributed under the terms of the BSD License. See the [License] for detailed information.
 
-2. Introduction
+$ Introduction
 
-Ped is an in-phone Python IDE with IDLE-like features. It lets you edit, execute and debug your scripts directly on your phone. Ped features a multi-document interface which means that you can simultaneously work on many files and switch between them at any time.
+Ped is an in-phone Python IDE with IDLE-like features. It lets you edit, execute and debug your scripts directly on your phone. Ped features a multi-document interface which means that you can simultaneously work on many files and switch between them at any time. It can also be easily extended using plugins.
 
-3. Usage
+$ Usage
 
-The following help section contains descriptions of all options available in Ped. A "Shortkey: <key>" in a description means that the given functionality in also available by pressing the pick-up key (the "green" key) followed by the <key>.
+The following section describes the usage of all options available in Ped.
 
-3.1. Options
+$$ Options
 
 Below you will find descriptions of all functions available in the Options menu at any given time.
 
-3.1.1. Run
+$$$ Run
 
 Executes the script you're currently working on. Available only if you're working on a Python script [3.3]. The standard input/output will be redirected to the Python Shell [3.4]. The script's namespace will be available in the shell after execution. If the Ask for arguments [3.5.4.1] option is enabled in settings, asks for script arguments before execution.
 
-3.1.2. History
+$$$ History
 
-Shortkey: Up/Down
 Opens a window with commands history. Available only in Python Shell [3.4]. The commands history lets you easily go back to, edit and recall a previously used command. Multiline commands are properly supported too. Choosing a command puts it back on the prompt.
 
-3.1.3. Topics List
+$$$ Topics List
 
 Opens a list of help topics. Available only in Help window.
 
-3.1.4. File
+$$$ File
 
-3.1.4.1. New
+$$$$ New
 
 Creates a new file. After selecting you will be prompted to choose between a Text file [3.2] and a Python script [3.3].
 
-3.1.4.2. Open...
+$$$$ Open...
 
 Opens a file browser letting you choose a file to open in the editor.
 
-3.1.4.3. Save
+$$$$ Save
 
 Saves the file you're currently working on.
 
-3.1.4.4. Save As...
+$$$$ Save As...
 
 Saves the file you're currently working on using a different name and/or location.
 
-3.1.4.5. Save All
+$$$$ Save All
 
 Saves all currently opened files. Equals to calling Save [3.1.4.3] on all opened files.
 
-3.1.4.6. Close
+$$$$ Close
 
 Closes the file you're currently working on. If the file wasn't saved, Ped will ask if you want to save it.
 The close function is also available on the right softkey (Exit).
 
-3.1.4.7. Close All
+$$$$ Close All
 
 Closes all files. Equals to calling Close [3.1.4.6] on all opened files.
 
-3.1.4.8. Export To...
+$$$$ Export To...
 
 Exports the buffer to a file. Pops up a dialog letting you choose the path and filename. Available in Python Shell [3.4] only.
 
-3.1.5. Edit
+$$$ Edit
 
-Shortkey: Edit (the "pen" key)
 Note. The shortkey does not work on 3rd edition devices.
 
-3.1.5.1. Find...
+$$$$ Find...
 
-Shortkey: 3
 Lets you search the text for a given string. Pops up a dialog asking you to enter the string. The search starts at current cursor position. If the string won't be found, you will have the ability to start the search from the beginning of the text.
 
-3.1.5.2. Find Next
+$$$$ Find Next
 
-Shortkey: 6
 If a string was found using the Find function [3.1.5.1], Find Next will search for next occurence of this string.
 
-3.1.5.3. Find All...
+$$$$ Find All...
 
-Shortkey: 2
 Lets you search the text for a given string. Pops up a dialog asking you to enter the string. Searches the whole document and displays a list of all occurences of the string. Choosing one jumps to its location within the text.
 
-3.1.5.4. Go to Line...
+$$$$ Go to Line...
 
-Shortkey: 4
 Jumps to a given line. Pops up a dialog asking you to enter the line number.
 
-3.1.5.5. Code Browser
+$$$$ Code Browser
 
-Shortkey: 8
 Opens a Code Browser. Available only if you're working on a Python script [3.3]. Code Browser displays the tree structure of the Python script. Choosing a function/method jumps to its definition in the script.
 
-3.1.5.6. Call Tip
+$$$$ Call Tip
 
-Shortkey: 5
 Call tip feature. If called from within function arguments parenthesis, tries to obtain more information about the arguments syntax for the given function and displays the results. If the function is documented, its docstring will also be displayed.
 
-3.1.5.7. Clear
+$$$$ Clear
 
 Clears the text buffer. Available in Python Shell [3.4] only.
 
-3.1.5.8. Top
+$$$$ Top
 
 Jumps to the top of the document.
 
-3.1.5.9. Bottom
+$$$$ Bottom
 
 Jumps to the bottom of the document.
 
-3.1.5.10. Full Screen
+$$$$ Full Screen
 
-Shortkey: 7
 Switches between normal and full screen mode. In full screen mode, the top pane with application icon and file name is hidden.
 
-3.1.6. Windows
+$$$ Windows
 
 Shortkey: Pick-Up (the "green" key)
 This dynamic menu contains a list of all currently opened windows (documents, file browsers, ...). Choosing a window switches the focus to it. Note that the shortkey to this menu is the green key pressed twice.
 
-3.1.7. Python Shell
+$$$ Python Shell
 
-Shortkey: *
 Opens the Python Shell window. See [3.4] for more information.
 
-3.1.8. Run Script...
+$$$ Run Script...
 
-Shortkey: 0
 Lets you execute a script by simply choosing it using a file browser without loading to the editor. The standard input/output will be redirected to the Python Shell [3.4]. The script's namespace will be available in the shell after execution. If the Ask for arguments [3.5.4.1] option is enabled in settings, asks for script arguments before execution.
 
-3.1.9. Settings
+$$$ Settings
 
-Shortkey: #
 Opens the Settings dialog which lets you adapt Ped to your preferences. See [3.5] for more information.
 
-3.1.10. Help
+$$$ Help
 
 Opens this help text.
 
-3.1.11. Exit
+$$$ Exit
 
 Closes all windows and exits Ped.
 
-3.2. Text file editor
+$$ Text file editor
 
 Text file editor is used if you open a text file (*.txt) or create a new one. The usage of the editor is simmilar to other text editors in your phone, for example the text message editor. An exception is the function of the select key, which inserts a new line into the text. Note that the copy/paste functionality is available using the edit key (press and hold it for the options to pop up).
 
-Shortkey: Up/Down
 Moves up/down one page. The number of lines/page is determined by the Page size setting [3.5.2.1].
 
-Shortkey: Left/Right
 Moves to the beginning/end of line.
 
 See the Options menu [3.1] for additional useful functions (some available with shortkeys too).
 
-3.3. Python script editor
+$$ Python script editor
 
 Python script editor is used if you open a Python script (*.py) or create w new one. It is simmilar to the text file editor [3.2] but include some additional features letting you edit your Python scripts much easier. For example, it automatically indents the lines after inserting a new line (see also [3.5.2.2]).
 
@@ -172,7 +158,7 @@ Note that in case of a Python script editor, the autocomplete list contains all 
 
 See the Options menu [3.1] for additional useful functions (some available with shortkeys too).
 
-3.4. Python Shell
+$$ Python Shell
 
 The Python Shell tries to mimic the features of the Python Shell found in the IDLE tool (distributed with Python for PCs). Among them are the autoindentation feature (see also [3.5.2.2]) or the line recall (if you scroll back in the buffer and press the select key on some line, it will be copied to the prompt).
 
@@ -187,58 +173,82 @@ Autocomplete feature. Opens a list of objects, statements and some frequently us
 
 See the Options menu [3.1] for additional useful functions (some available with shortkeys too).
 
-3.5. Settings
+$$ Settings
 
 The settings dialog lets you adapt Ped to your preferences. In contains the following settings.
 
-3.5.1. View
+$$$ View
 
 Options available in View tab.
 
-3.5.1.1. Text font
+$$$$ Text font
 
 Font used in all text controls.
 
-3.5.1.2. Editor color
+$$$$ Editor color
 
 Text color used in all text controls apart from Python Shell [3.4] which uses Shell color [3.5.1.3] instead.
 
-3.5.1.3. Shell color
+$$$$ Shell color
 
 Text color used in Python Shell [3.4].
 
-3.5.1.4. Orientation
+$$$$ Orientation
 
 Screen orientation, either automatic, portrait or landscape. On pre-3rd edition devices, only automatic is available.
 
-3.5.2. Text
+$$$ Text
 
 Options available in Text tab.
 
-3.5.2.1. Page size
+$$$$ Page size
 
 Number of lines per screen. This value is used in page up/down functionality.
 
-3.5.2.2. Indentation size
+$$$$ Indentation size
 
 Number of space chars used by the autoindentation feature.
 
-3.5.3. File
+$$$ File
 
 Options available in File tab.
 
-3.5.3.1. Default encoding
+$$$$ Default encoding
 
 Encoding used for new files.
 
-3.5.3.2. Autosave
+$$$$ Autosave
 
 If not set to "Off", causes the files to be automatically saved in given time intervals. Doesn't apply to new files which were not manually saved yet.
 
-3.5.4. Misc
+$$$ Misc
 
 Options available in Misc tab.
 
-3.5.4.1. Ask for arguments
+$$$$ Ask for arguments
 
 If enabled, Ped will ask for arguments upon script startup (either using Run [3.1.1] in script editor or Run script [3.1.8] option). The arguments will of course be available in sys.argv.
+
+$$ License
+
+Copyright (c) 2007-2008, Arkadiusz Wahlig
+
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+    * Neither the name of Arkadiusz Wahlig nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
