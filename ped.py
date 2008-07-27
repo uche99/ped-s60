@@ -2075,9 +2075,8 @@ class PluginsWindow(Window):
             helpfile = os.path.join(path, 'English')
         try:
             win = HelpWindow(path=helpfile,
-                title=_('Help for %s') % manifest['name'])
-            win.body.add((u'%s\n' + _('Version: %s') + u'\n\n') % (manifest['name'], manifest['version']))
-            win.body.set_pos(0)
+                title=_('Help for %s') % manifest['name'],
+                head=(u'%s\n' + _('Version: %s') + u'\n\n') % (manifest['name'], manifest['version']))
             win.open()
         except IOError:
             ui.note(_('Cannot load help file'))
