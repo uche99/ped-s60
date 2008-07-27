@@ -1,4 +1,4 @@
-Adds a configurable shortkey to insert/remove comment char from the beginning of a line.
+Adds a feature to comment/uncomment a line of Python code. To use it, assign the "Comment Line" function to a shortcut using the settings dialog.
 
 Copyright (c) 2008, Arkadiusz Wahlig
 <arkadiusz.wahlig@gmail.com>
