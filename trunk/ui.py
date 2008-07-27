@@ -891,6 +891,8 @@ class FilteredListboxModifier(object):
         except ValueError:
             if act >= len(flst):
                 act = len(flst)-1
+        except IndexError:
+            act = 0
         assert act >= 0
         self.body.set_list(flst, act)
 
@@ -1019,9 +1021,9 @@ class FileBrowserWindow(Window, FilteredListboxModifier):
 
     def update(self, mark=''):
         self.set_list([(_('Loading...'), self.icons['loading'])])
+        e32.ao_yield()
         if self.path == '':
             self.filter_title = self.gtitle
-            e32.ao_yield()
             # drives
             self.lstall = [(self.DRIVE, self.icons['drive'], x, x.encode('utf8')) for x in e32.drive_list()]
             # links
@@ -1031,7 +1033,9 @@ class FileBrowserWindow(Window, FilteredListboxModifier):
                 else:
                     return (self.DIR, self.icons['folder'], link[1], link[0])
             self.lstall += map(format, self.links)
-        elif self.path == 'recents':
+            if os.path.exists('C:\\System\\Mail\\00001001_S'):
+                self.lstall.append((self.DIR, self.icons['folder'], _('Messages'), ':messages'))
+        elif self.path == ':recents':
             self.filter_title = _('Recent files')
             def format(filename):
                 path, name = os.path.split(filename)
@@ -1046,6 +1050,19 @@ class FileBrowserWindow(Window, FilteredListboxModifier):
             if len(recents) != recentslen:
                 self.settings.save()
             self.lstall = map(format, recents)
+        elif self.path == ':messages':
+            self.filter_title = _('Messages')
+            def scandir(path):
+                lst = []
+                for name in os.listdir(path):
+                    fullpath = os.path.join(path, name)
+                    if os.path.isdir(fullpath):
+                        lst.extend(scandir(fullpath))
+                    elif os.path.isfile(fullpath) and path.endswith('_F'):
+                        lst.append((self.FILE, self.get_file_icon(fullpath),
+                            name.decode('utf8'), fullpath))
+                return lst
+            self.lstall = scandir('C:\\System\\Mail\\00001001_S')
         else:
             if self.path[-2:] == ':\\':
                 # we are in drive's root directory
@@ -1075,24 +1092,23 @@ class FileBrowserWindow(Window, FilteredListboxModifier):
         self.lstall.sort(compare)
         if self.path == '':
             # add link to recent files at the top
-            self.lstall.insert(0, (self.DIR, self.icons['folder'], _('Recent files'), 'recents'))
+            self.lstall.insert(0, (self.DIR, self.icons['folder'], _('Recent files'), ':recents'))
         active = 0
         if mark != '':
             try:
                 active = [x[3].lower() for x in self.lstall].index(mark.lower())
             except ValueError:
                 pass
-        if not self.lstall:
-            self.lstall.append((self.INFO, self.icons['info'], _('(empty)'), None))
         self.set_lstall(active)
         self.make_menu()
 
     def make_menu(self):
         menu = Menu()
         menu.append(MenuItem(_('Open'), target=self.select_click))
-        if self.path == 'recents':
+        if self.path.startswith(':'):
             menu.append(MenuItem(_('Drives'), target=self.drives_click))
-            menu.append(MenuItem(_('Delete'), target=self.delete_click))
+            if self.path == ':recents':
+                menu.append(MenuItem(_('Delete'), target=self.delete_click))
         elif self.path != '':
             if self.mode == fbmSave:
                 menu.append(MenuItem(_('Save here...'), target=self.save_click))
@@ -1108,14 +1124,18 @@ class FileBrowserWindow(Window, FilteredListboxModifier):
     def set_lstall(self, active=None):
         if active is None:
             active = self.current()
+            if active < 0:
+                active = 0
         lst = self.lstall
         if self.filter_ext:
             lst = [x for x in lst if x[0] != self.FILE or \
                 os.path.splitext(x[3])[-1].lower() in self.filter_ext]
         try:
             active = lst.index(self.lstall[active])
-        except ValueError:
+        except (ValueError, IndexError):
             active = 0
+        if not lst:
+            lst.append((self.INFO, self.icons['info'], _('(empty)'), None))
         self.set_list([(unicode(x[2]), x[1]) for x in lst], active)
         self.lst = lst
 
@@ -1138,8 +1158,6 @@ class FileBrowserWindow(Window, FilteredListboxModifier):
                 self.update()
             elif item[0] == self.FILE:
                 if self.mode == fbmOpen:
-                    if self.path == 'recents':
-                        self.path = ''
                     self.path = os.path.join(self.path, item[3])
                     self.modal_result = self.path
                     self.add_recent(self.path)
@@ -1232,6 +1250,8 @@ class FileBrowserWindow(Window, FilteredListboxModifier):
         self.close()
 
     def delete_click(self):
+        if self.path == ':messages':
+            return
         i = self.current()
         if i < 0:
             return
@@ -1239,15 +1259,16 @@ class FileBrowserWindow(Window, FilteredListboxModifier):
         if item[0] not in [self.FILE, self.DIR]:
             return
         if query(_('Delete %s?') % item[2], 'query'):
+            path = os.path.join(self.path, item[3])
             try:
-                path = os.path.join(self.path, item[3])
                 if os.path.isfile(path):
                     os.remove(path)
                 else:
                     os.rmdir(path)
-                self.update()
             except OSError:
                 note(_('Cannot delete'), 'error')
+            else:
+                self.update()
 
     def rename_click(self):
         i = self.current()
@@ -1296,7 +1317,7 @@ class FileBrowserWindow(Window, FilteredListboxModifier):
         if i < 0:
             return
         item = self.lst[i]
-        if item[0] not in [self.DRIVE, self.FILE, self.DIR] or item[3] == 'recents':
+        if item[0] not in [self.DRIVE, self.FILE, self.DIR] or item[3].startswith(':'):
             return
         if item[0] == self.DRIVE:
             from sysinfo import free_drivespace
