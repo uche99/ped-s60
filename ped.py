@@ -437,17 +437,17 @@ class TextWindow(Window):
                 ', '.join([repr(x) for x in kwargs.keys()]))
 
     def apply_settings(self):
-        self.set_style(font=app.settings.editor.fontname,
-            size=app.settings.editor.fontsize,
-            antialias=app.settings.editor.fontantialias,
-            bold=app.settings.editor.fontbold,
-            color=app.settings.editor.color)
+        self.set_style(font=app.settings.text.fontname,
+            size=app.settings.text.fontsize,
+            antialias=app.settings.text.fontantialias,
+            bold=app.settings.text.fontbold,
+            color=app.settings.text.fontcolor)
         self.set_shortcuts()
     
     def set_shortcuts(self):
         Window.set_shortcuts(self)
         items = dict(self.get_shortcuts_items())
-        for key, val in app.settings.editor.shortcuts.items():
+        for key, val in app.settings.text.shortcuts.items():
             if val:
                 try:
                     item = items[val]
@@ -588,8 +588,8 @@ class TextWindow(Window):
         elif self.size == ui.sizLarge:
             sett += 'full'
         else:
-            sett += 'norm'
-        self.move_line_up(count=app.settings.editor[sett].get()+shift)
+            sett += 'port'
+        self.move_line_up(count=app.settings.text[sett].get()+shift)
 
     def move_page_down(self):
         sett = 'pagesize'
@@ -598,8 +598,8 @@ class TextWindow(Window):
         elif self.size == ui.sizLarge:
             sett += 'full'
         else:
-            sett += 'norm'
-        self.move_line_down(count=app.settings.editor[sett].get()+shift)
+            sett += 'port'
+        self.move_line_down(count=app.settings.text[sett].get()+shift)
 
     def move_line_up(self, count=1):
         lines = self.get_lines()
@@ -693,8 +693,8 @@ class TextFileWindow(TextWindow):
         TextWindow.apply_settings(self)
         try:
             if not self.fixed_encoding:
-                self.encoding = app.settings.main.encoding
-            autosave = app.settings.main.autosave
+                self.encoding = app.settings.file.encoding
+            autosave = app.settings.file.autosave
             self.autosave_timer.cancel()
             if autosave and self.path is not None:
                 self.autosave_timer.after(autosave, self.autosave)
@@ -773,7 +773,7 @@ class TextFileWindow(TextWindow):
     def save(self):
         if self.path is None:
             return self.save_as()
-        autosave = app.settings.main.autosave
+        autosave = app.settings.file.autosave
         self.autosave_timer.cancel()
         if autosave:
             self.autosave_timer.after(autosave, self.autosave)
@@ -928,7 +928,7 @@ class PythonModifier(object):
         if pos > 0:
             if text[pos-1] == u':':
                 # add more indent if line ends with a colon
-                ind += app.settings.python.indent
+                ind += app.settings.python.indentsize
             else:
                 # add more indent if line has unmatched brackets
                 level = 0
@@ -941,7 +941,7 @@ class PythonModifier(object):
                         level -= 1
                     i += 1
                 if level > 0:
-                    ind += app.settings.python.indent
+                    ind += app.settings.python.indentsize
         self.body.add(u' '*ind)
 
     def py_autocomplete(self):
@@ -1437,7 +1437,7 @@ class PythonFileWindow(TextFileWindow, PythonModifier):
     def set_shortcuts(self):
         TextFileWindow.set_shortcuts(self)
         items = dict(self.get_shortcuts_items())
-        for key, val in app.settings.python.shortcuts.items():
+        for key, val in app.settings.python.fileshortcuts.items():
             if val:
                 try:
                     item = items[val]
@@ -1770,11 +1770,11 @@ class PythonShellWindow(IOWindow, PythonModifier):
             self.lock(False)
 
     def apply_settings(self):
-        self.set_style(font=app.settings.editor.fontname,
-            size=app.settings.editor.fontsize,
-            antialias=app.settings.editor.fontantialias,
-            bold=app.settings.editor.fontbold,
-            color=app.settings.python.shellcolor)
+        self.set_style(font=app.settings.text.fontname,
+            size=app.settings.text.fontsize,
+            antialias=app.settings.text.fontantialias,
+            bold=app.settings.text.fontbold,
+            color=app.settings.python.shellfontcolor)
         self.set_shortcuts()
         
     def set_shortcuts(self):
@@ -1820,7 +1820,7 @@ class PythonShellWindow(IOWindow, PythonModifier):
         try:
             f = file(path, 'w')
             f.write(self.body.get().translate({0x2028: 0x2029, 0xa0: 0x20}).replace(u'\u2029',
-                u'\r\n').encode(app.settings.main.encoding))
+                u'\r\n').encode(app.settings.file.encoding))
             f.close()
         except IOError:
             ui.note(_('Cannot export the output'), 'error')
@@ -2233,27 +2233,29 @@ class Application(object):
         allcolors = ((_('Black'), 0x000000), (_('Red'), 0x990000), (_('Green'), 0x008800), (_('Blue'), 0x000099), (_('Purple'), 0x990099))
         settings = ui.Settings(os.path.join(self.path, 'settings.bin'), title=_('Settings'))
         settings.append('main', ui.SettingsGroup(_('Main')))
-        settings.append('editor', ui.SettingsGroup(_('Editor')))
+        settings.append('text', ui.SettingsGroup(_('Text')))
+        settings.append('file', ui.SettingsGroup(_('File')))
         settings.append('python', ui.SettingsGroup(_('Python')))
         settings.append('plugins', ui.SettingsGroup(_('Plugins')))
         settings.main.append('language', ui.ChoiceSetting(_('Language'), u'English', alllanguages))
-        settings.main.append('encoding', ui.ChoiceSetting(_('Default encoding'), 'utf-8', ('ascii', 'latin-1', 'utf-8', 'utf-16')))
-        settings.main.append('autosave', ui.ChoiceValueSetting(_('Autosave'), 0, ((_('Off'), 0), (_('%d sec') % 30, 30), (_('%d min') % 1, 60), (_('%d min') % 2, 120), (_('%d min') % 5, 300), (_('%d min') % 10, 600))))
-        settings.main.append('shortcuts', ShortcutsGroupSetting(_('Default shortcuts'), RootWindow))
-        settings.editor.append('fontname', ui.ChoiceSetting(_('Font'), defaultfont, allfonts))
-        settings.editor.append('fontsize', ui.IntegerSetting(_('Font size'), 12))
-        settings.editor.append('fontantialias', ui.BoolSetting(_('Font anti-aliasing'), True))
-        settings.editor.append('fontbold', ui.BoolSetting(_('Bold font'), False))
-        settings.editor.append('color', ui.ChoiceValueSetting(_('Color'), 0x000099, allcolors))
-        settings.editor.append('pagesizenorm', ui.IntegerSetting(_('Page size, normal'), 8, vmin=1, vmax=64))
-        settings.editor.append('pagesizefull', ui.IntegerSetting(_('Page size, full screen'), 11, vmin=1, vmax=64))
-        settings.editor.append('pagesizeland', ui.IntegerSetting(_('Page size, landscape'), 9, vmin=1, vmax=64))
-        settings.editor.append('shortcuts', ShortcutsGroupSetting(_('Shortcuts'), TextFileWindow))
+        settings.main.append('shortcuts', ShortcutsGroupSetting(_('Global shortcuts'), RootWindow))
+        settings.text.append('fontname', ui.ChoiceSetting(_('Font name'), defaultfont, allfonts))
+        settings.text.append('fontsize', ui.IntegerSetting(_('Font size'), 12))
+        settings.text.append('fontantialias', ui.BoolSetting(_('Font anti-aliasing'), True))
+        settings.text.append('fontbold', ui.BoolSetting(_('Font bold'), False))
+        settings.text.append('fontcolor', ui.ChoiceValueSetting(_('Font color'), 0x000099, allcolors))
+        settings.text.append('pagesizefull', ui.IntegerSetting(_('Page size (full screen)'), 11, vmin=1, vmax=64))
+        settings.text.append('pagesizeport', ui.IntegerSetting(_('Page size (portrait)'), 8, vmin=1, vmax=64))
+        settings.text.append('pagesizeland', ui.IntegerSetting(_('Page size (landscape)'), 9, vmin=1, vmax=64))
+        settings.text.append('shortcuts', ShortcutsGroupSetting(_('Text shortcuts'), TextWindow))
+        settings.file.append('encoding', ui.ChoiceSetting(_('Default encoding'), 'utf-8', ('ascii', 'latin-1', 'utf-8', 'utf-16')))
+        settings.file.append('autosave', ui.ChoiceValueSetting(_('Autosave'), 0, ((_('Off'), 0), (_('%d sec') % 30, 30), (_('%d min') % 1, 60), (_('%d min') % 2, 120), (_('%d min') % 5, 300), (_('%d min') % 10, 600))))
+        settings.file.append('shortcuts', ShortcutsGroupSetting(_('Text file shortcuts'), TextFileWindow))
         settings.python.append('askforargs', ui.BoolSetting(_('Ask for arguments'), False))
-        settings.python.append('shellcolor', ui.ChoiceValueSetting(_('Shell text color'), 0x008800, allcolors))
-        settings.python.append('indent', ui.IntegerSetting(_('Indentation size'), 4, vmin=1, vmax=8))
-        settings.python.append('shortcuts', ShortcutsGroupSetting(_('Python file shortcuts'), PythonFileWindow, True))
-        settings.python.append('shellshortcuts', ShortcutsGroupSetting(_('Shell shortcuts'), PythonShellWindow, True))
+        settings.python.append('shellfontcolor', ui.ChoiceValueSetting(_('Shell font color'), 0x008800, allcolors))
+        settings.python.append('indentsize', ui.IntegerSetting(_('Indentation size'), 4, vmin=1, vmax=8))
+        settings.python.append('fileshortcuts', ShortcutsGroupSetting(_('Python file shortcuts'), PythonFileWindow, True))
+        settings.python.append('shellshortcuts', ShortcutsGroupSetting(_('Python shell shortcuts'), PythonShellWindow, True))
         self.settings = settings
 
         # setup file browser

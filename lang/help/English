@@ -84,15 +84,83 @@ Once you get your code done and you want to test it, use the Run option from the
 
 $$ Settings
 
-The settings dialog is divided into tabs.
+The settings dialog is opened by selecting Settings from the Tools menu. It is divided into several tabs.
 
 $$$ Main tab
 
-$$$ Editor tab
+This tab contains global Ped options.
+
+* Language - Ped's user interface language. Application restart is required after changing.
+
+* Global shortcuts - global keyboard shortcuts. Shortcuts defined here apply to all Ped windows including the desktop.
+
+$$$ Text tab
+
+This tab contains options for every Ped window which displays text, including [Editor], [Python editor] and [Python Shell].
+
+* Font name - name of the font.
+
+* Font size - size of the font. Has no effect on 2nd edition devices.
+
+* Font anti-aliasing - enables or disables font anti-aliasing. Has no effect on 2nd edition devices.
+
+* Font bold - selects a bold font.
+
+* Font color - color of the text.
+
+* Page size (full screen) - number of text lines on a screen when in full screen mode (portrait, full screen on). This setting is used by the page-up/down functionality (see the [Editor] chapter).
+
+* Page size (portrait) - number of text lines on a screen when in portrait mode (full screen off).
+
+* Page size (landscape) - number of text lines on a screen when in landscape mode.
+
+* Text shortcuts - text keyboard shortcuts. These shortcuts are added to the text windows on top of the global shortcuts defined in the [Main tab].
+
+$$$ File tab
+
+This tab contains options for Ped windows which are used to edit files, including [Editor] and [Python editor].
+
+* Default encoding - new files are saved using this encoding.
+
+* Autosave - if not set to "Off", causes the files to be automatically saved in given time intervals. Doesn't apply to new files which were not manually saved yet.
+
+* Text file shortcuts - file editor keybord shortcuts. These shortcuts are added to the editor window on top of the shortcuts defined in the [Text tab].
 
 $$$ Python tab
 
+This tab contains all Python specific Ped options.
+
+* Ask for arguments - if enabled, Ped will ask for arguments every time a script is run.
+
+* Shell font color - color of text in [Python Shell]. This overrides the Font color setting in the [Text tab].
+
+* Indentation size - number of space chars inserted by the auto-indentation feature.
+
+* Python file shortcuts - [Python editor] keyboard shortcuts. These shortcuts are added to the Python editor window on top of the shortcuts defined in the [File tab].
+
+* Python shell shortcuts - [Python Shell] keyboard shortcuts. These shortcuts are added to the Python Shell window on top of the shortcuts defined in the [Text tab].
+
+$$$ Plugins tab
+
+This tab is normally hidden. It is shown if plugins add some options to it. Refer to plugins help files for more information. Read the [Plugins] section to learn more about plugins.
+
 $$ Plugins
+
+Ped can be extended using special Ped plugins. The plugins manager opened using the Plugins option in the Tools menu is used to install or remove plugins. It also shows you what plugins are currently installed and running and allows you to display their Help files (select Help from the options menu).
+
+$$$ Installation
+
+Ped does not take care of downloading of plugins. You have to get the plugin file by whatever means are available and transfer the file to your phone. A plugin file is simply a zip file containing the plugin code (Python) and associated files.
+
+If you already have the plugin file on the phone, select Install from the options menu of the plugins manager and choose the plugin file using the [File browser]. Follow the on-screen instructions to finish the installation.
+
+A restart of Ped is needed for the plugin to start working.
+
+$$$ Uninstallation
+
+To uninstall a plugin, go to the plugins manager (see [Plugins]), select a plugin to remove and press C or select Uninstall from the options menu. Follow the on-screen instructions to remove the plugin.
+
+A restart of Ped is needed for the plugin to stop working.
 
 $$ Sessions
 
@@ -104,6 +172,8 @@ Ped features a sessions mechanism which lets you restore all document windows af
 * When phone runs low on memory - Symbian OS can close an application running in the background if it needs memory. If Ped is closed this way, the session is stored before it happens.
 
 If the session is stored and Ped is started, a question dialog is displayed asking if the session should be reloaded. Note that no matter if the session is loaded or not, it is deleted. In other words, Ped will ask only once.
+
+$$ Shortcuts
 
 $$ Code Browser
 
