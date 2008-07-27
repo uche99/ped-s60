@@ -1585,7 +1585,7 @@ class GroupSettingWindow(Window):
 
     def key_press(self, key):
         if key == EKeyBackspace:
-            self.remove_click()
+            self.delete_click()
             return
         Window.key_press(self, key)
 
@@ -1612,6 +1612,10 @@ class GroupSettingWindow(Window):
             setting = self.setting.get_new(title)
             if setting is not None:
                 if setting.edit(self):
+                    if name in self.setting.value.keys():
+                        if not query(_('Already exists. Replace?'), 'query'):
+                            return
+                        self.setting.value.remove(name)
                     self.setting.value.append(name, setting)
                     self.setting.value.sort()
                     i = self.setting.value.keys().index(name)
@@ -1781,6 +1785,8 @@ class SettingsGroup(object):
     def append(self, name, obj):
         if isinstance(obj, (SettingsGroup, Setting)):
             self.objs[name] = obj
+            if name in self.order:
+                self.order.remove(name)
             self.order.append(name)
         else:
             raise TypeError('\'obj\' must be a Setting or a SettingsGroup object')
