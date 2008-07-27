@@ -874,30 +874,38 @@ class PythonModifier(object):
     def _get_text(self):
         return self.body.get(), self.body.get_pos()
 
-    def _get_objects(self, name):
-        s = name.split('.')
-        n = '.'.join(s[:-1])
-        e = s[-1]
-        if n == '':
-            d = [x for x in eval('dir()', self.py_namespace) if x.startswith(e)]
-            try:
-                return dict([(x, eval('.'.join(s[:-1] + [x]), self.py_namespace)) for x in d])
-            except:
-                pass
+    def _get_objects(self, exp):
+        i = exp.rfind('.')
+        if i > 0:
+            exp, limit = exp[:i], exp[i+1:]
+        elif i == 0: # expression cannot start with a dot
+            return {}
         else:
+            exp, limit = '', exp
+        limit = limit.strip()
+        if exp:
+            # expression
             namespace = sys.modules.copy()
             namespace.update(self.py_namespace)
             try:
-                d = [x for x in eval('dir(%s)' % n, namespace) if x.startswith(e)]
-                return dict([(x, eval('.'.join(s[:-1] + [x]), namespace)) for x in d])
+                d = [x for x in eval('dir(%s)' % exp, namespace) if x.startswith(limit)]
+                return dict([(x, eval('%s.%s' % (exp, x), namespace)) for x in d])
+            except:
+                pass
+        else:
+            # globals
+            try:
+                d = [x for x in eval('dir()', self.py_namespace) if x.startswith(limit)]
+                return dict([(x, eval(x, self.py_namespace)) for x in d])
             except:
                 pass
         return {}
 
-    def _get_object(self, name):
-        d = self._get_objects(name)
+    def _get_object(self, exp):
+        d = self._get_objects(exp)
         try:
-            return d[name.split('.')[-1]]
+            # if rfind() returns -1 then we will get whole <exp>
+            return d[exp[exp.rfind('.')+1]]
         except:
             pass
 
@@ -938,38 +946,61 @@ class PythonModifier(object):
 
     def py_autocomplete(self):
         text, pos = self._get_text()
-        epos = pos
-        spos = pos - 1
-        while spos >= 0:
-            if not (text[spos].isalnum() or text[spos] in u'._'):
-                break
-            spos -= 1
-        spos += 1
-        # autocomplete should be limited to the objects starting with name
-        name = text[spos:pos]
-        menu = ui.Menu('%s*' % name)
-        menu.extend([ui.MenuItem(title) for title in self._get_objects(name).keys()])
-        menu.extend([ui.MenuItem(title, offset=off) for title, off in statements if title.startswith(name)])
+        begpos = pos
+
+        brackets = {'(': ')', '[': ']', '{': '}'}
+        brstack = []
+        quote = ''
+        
+        # parse back to get the expression
+        pos -= 1; lastc = lastid = ''
+        while pos >= 0:
+            c = text[pos]
+            if c in '"\'': # eat everything inside quotes
+                if not quote:
+                    quote = c
+                elif c == quote and (pos == 0 or text[pos-1] != '\\'):
+                    quote = ''
+            elif not quote:
+                if c in brackets.values(): # eat everything inside brackets
+                    brstack.append(c)
+                elif c in brackets.keys():
+                    if not brstack: # opening bracket, stop
+                        break
+                    if brstack.pop() != brackets[c]: # unmatched brackets, stop
+                        break
+                elif not brstack:
+                    if c.isalnum() or c in '._':
+                        # if last char was a space which wasn't preceeded by a dot, stop
+                        if lastc.isspace() and lastid not in ('', '.'):
+                            break
+                        lastid = c
+                    elif not c.isspace():
+                        break
+            lastc = c
+            pos -= 1
+        pos += 1
+
+        exp = text[pos:begpos].lstrip()
+
+        # build the menu
+        menu = ui.Menu('%s*' % exp)
+        menu.extend([ui.MenuItem(title) for title in self._get_objects(exp).keys()])
+        menu.extend([ui.MenuItem(title, offset=off) for title, off in statements \
+            if title.startswith(exp)])
         menu.sort()
-        symbitems = [ui.MenuItem(title, offset=off, no_replace=True) for title, off in symbols]
-        if name:
+        symbitems = [ui.MenuItem(title, offset=off) for title, off in symbols]
+        if exp:
             menu.extend(symbitems)
         else:
             menu[:] = symbitems + menu
+            
+        # open the autocomplete list
         item = menu.popup(full_screen=True, search_field=True)
-        if item:
-            if not getattr(item, 'no_replace', False):
-                # first we will remove all alnum chars following the original position
-                while epos < self.body.len():
-                    if not (text[epos].isalnum() or text[epos] in u'._'):
-                        break
-                    epos += 1
-                if epos > pos:
-                    self.body.delete(pos, epos - pos)
-                    self.body.set_pos(pos)
-            # now we will insert the new object
+        if item is not None:
+            # insert the selected object
             ws = s = unicode(item.title)
-            n = name.split(u'.')[-1]
+            n = exp.split(u'.')[-1]
             if s.startswith(n):
                 s = s[len(n):]
             self.body.add(s)
@@ -1843,9 +1874,11 @@ class HelpWindow(TextWindow):
             raise TypeError('specify either \'text\' or \'path\' arguments')
         self.menu.insert(0, ui.MenuItem(_('Topic List'), target=self.topics_click))
         self.history = []
-        text = ''.join((head, text, tail))
         self.topics = ui.Menu(_('Topic List'))
         stack = []
+        lines = []
+        text = ''.join((head, text, tail))
+        offset = 0
         for ln in text.splitlines(True):
             if ln.startswith('$'): # topic
                 title = ln.lstrip('$')
@@ -1859,9 +1892,13 @@ class HelpWindow(TextWindow):
                 chapter = u'.'.join(stack)
                 chaptit = u'%s. %s' % (chapter, title)
                 self.topics.append(ui.MenuItem(chaptit, chapter=chapter,
-                    topic=title, pos=self.body.get_pos()))
+                    topic=title, pos=offset))
                 ln = u'%s\n' % chaptit
-            self.body.add(ln)
+            lines.append(ln)
+            offset += len(ln)
+            if ln.endswith('\r\n'):
+                offset -= 1
+        self.body.set(''.join(lines))
         self.body.set_pos(0)
 
     def add_to_history(self, pos=None):
@@ -1984,6 +2021,8 @@ class PluginsWindow(Window):
         if os.path.exists(self.plugins_path):
             for name in os.listdir(self.plugins_path):
                 path = os.path.join(self.plugins_path, name)
+                if not os.path.isdir(path):
+                    continue
                 try:
                     manifest = Manifest(os.path.join(path, 'manifest.txt'))
                 except IOError:
