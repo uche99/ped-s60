@@ -34,8 +34,6 @@ $$ Editor
 
 After opening a file or creating a new one you will be presented with the editor window. This is the main Ped's window which is used to edit files.
 
-$$$ Editor options
-
 The Options menu of the editor contains all items described in the [Options] chapter. Additionaly it provides some editor specific functionalities.
 
 * Edit menu - contains functions used to search through the document including both basic and so called Find All function which searches for all instances of given text at once. The menu also provides options to browse the document more easily like Go to line or Top/Bottom.
@@ -62,9 +60,9 @@ A smart auto-indentation feature is available. The indentation size can be confi
 
 The Green-Select key shortcut triggers the [Autocomplete] feature which lets you type much faster.
 
-A [Call Tip] function is added to the Edit menu. You can also assign it to a key shortcut using the [Settings] dialog.
+A [Call Tip] function is added to the Edit menu.
 
-You can clear the buffer at any time using the Clear option from the Edit menu. This may also be configured as a key shortcut.
+You can clear the buffer at any time using the Clear option from the Edit menu.
 
 The File menu contains an option to Export the buffer to a file after selecting it in a [File Browser].
 
@@ -78,7 +76,7 @@ A smart auto-indentation feature is available with a configurable indentation si
 
 The Green-Select key shortcut triggers the [Autocomplete] feature which lets you type much faster.
 
-A [Call Tip] function is added to the Edit menu. You can also assign it to a key shortcut using the [Settings] dialog.
+A [Call Tip] function is added to the Edit menu.
 
 Another function added to the Edit menu is a [Code Browser]. It will let you easily browse through all classes and functions defined by your file.
 
@@ -86,23 +84,74 @@ Once you get your code done and you want to test it, use the Run option from the
 
 $$ Settings
 
+The settings dialog is divided into tabs.
+
+$$$ Main tab
+
+$$$ Editor tab
+
+$$$ Python tab
+
+$$ Plugins
+
 $$ Sessions
 
-Ped features a sessions mechanism which lets you restore all document windows after closing and reopening the application. The session is saved in three cases.
+Ped features a sessions mechanism which lets you restore all document windows after closing and reopening the application. The session is saved in four cases.
 
 * Before script execution - if the script crashes and takes Ped with it, you will be able to continue your work right where you stopped after restarting Ped.
 * On Red key press - if you press the Red key on 3rd edition device, it will force Python (including Ped) to close. Before it happens, Ped will store the current session.
 * When Exit is selected - if you select the Exit option from [Options] menu, you will be asked if you want to store the session. Doing so will let you continue your work later.
+* When phone runs low on memory - Symbian OS can close an application running in the background if it needs memory. If Ped is closed this way, the session is stored before it happens.
 
 If the session is stored and Ped is started, a question dialog is displayed asking if the session should be reloaded. Note that no matter if the session is loaded or not, it is deleted. In other words, Ped will ask only once.
 
 $$ Code Browser
 
+The Code Browser is available in the Edit menu in [Python editor] window. It parses the Python source you're currently working on and lets you browse the classes, methods and functions. Selecting an item jumps to the definition in the code. The Code Browser helps you a lot if you're editing large files.
+
+After opening you will be presented with a list of global classes and functions defined in your source. If an item ends with "->", you can press the Right button or select Browse from the menu to see objects defined in this object. To go back, press Left or select Back from the menu.
+
+Click on an object to select it and see the code defining it.
+
+You can also use the star key (*) to filter the list. Pressing it for the first time brings up a dialog where a pattern can be entered. Accepting the dialog hides all items which did not contain the entered text in their names. Second star key press brings up a small menu with options to show all items again or enter a new pattern.
+
 $$ Autocomplete
+
+Autocomplete lets you write your code much faster by completing the names of attributes and functions for you. You can access it by pressing the Green-Select shortcut. Once started, the expression left to the cursor is used to build a list of items that match it and could be inserted at the cursor position. Choosing one closes the items list and inserts the selected into the code.
+
+You can start the autocomplete after entering first few chars of a function name. The list will contain only functions with names starting with the entered chars. If you enter a name of an object followed by a dot ("."), the list will contain all attributes of this object.
+
+Note that this feature works best in the [Python Shell] because of its interactivity. In the [Python editor], the namespace of last execution is used to build the autocompletion lists.
 
 $$ Call Tip
 
+Call Tip displays information about the arguments syntax of a function. You have to put the cursor inside the arguments parenthesis before calling this function. The information is based on the docstrings and introspection of function objects.
+
+Note that introspection works only with pure Python functions and since most of the built-in PyS60 functions are written in C and have the docstrings removed to save memory, no information is available for them.
+
+Call Tip is available in the Edit menu of [Python Shell] and [Python editor].
+
 $$ File Browser
+
+Whenever there is a need to select a file throughout Ped, the same file browser is used. This file browser provides many usefull features making working with files using Ped an easy task.
+
+The main file browser screen contains a list of drives available on the phone along with a shortcut to recently opened/saved files and some standard directories like C:\Python or E:\Python.
+
+To enter a drive or directory, the Right button or Open menu option can be used. Alternatively you can use the Select button.
+
+To go one level up, use the Left button or Parent menu option.
+
+To select a file, use the Select button.
+
+The hash key (#) can be used to go directly to the main screen (drives).
+
+The star key (*) is a filter key. Pressing it for the first time brings up a dialog where a pattern can be entered. Accepting the dialog hides all items which did not contain the entered text in their names. Second star key press brings up a small menu with options to show all items again or enter a new pattern.
+
+The 0 key displays additional information about selected item, like size or last modification date.
+
+The C key deletes the selected item.
+
+The Options menu of the file browser lets you also create new directories or rename existing items.
 
 $ License
 
