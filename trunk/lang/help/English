@@ -10,7 +10,7 @@ Ped is an in-phone Python IDE with IDLE-like features. It lets you edit, execute
 
 $ Usage
 
-After starting, Ped welcomes you with an empty screen only displaying version information. This is Ped's desktop which will be visible when all other windows are closed. Pressing the right softkey (Exit) while the desktop is displayed, closes Ped.
+After starting, Ped welcomes you with an empty screen only displaying version information. This is Ped's desktop which will be visible when all other windows are closed. Pressing the right softkey (Exit) while the desktop is displayed, closes Ped. Otherwise, it closes the currently visible window.
 
 To start working, go to the [Options] menu or press the Select key which lets you load a file or create a new one quickly.
 
@@ -18,29 +18,29 @@ You can also configure keyboard shortcuts to make you work even faster. See the 
 
 $$ Options
 
-The options menu is always available under the left softkey. Most of the options are available all the time, some of them are specific to currently visible window.
+The options menu is always available under the left softkey. All options listed here are available in most Ped windows.
 
 * File menu - contains options needed to open an existing or create a new file. Open causes the [File Browser] to open to let you select a file to load.
 
 * Windows menu - lists all currently opened windows and lets you switch between them. This function an be accessed quickly by pressing the Green-Green shortcut (the Green key pressed twice). This menu is hidden if there are no windows open.
 
-* Python Shell - opens the [Python Shell].
+* Python Shell - opens the [Python Shell] or brings it to front if it's already opened.
 
-* Run Script - opens a [File Browser] where you can choose a script to execute. The standard input/output will be redirected to the [Python Shell] which will be opened first if needed. The script's namespace will be available in the shell after execution for post-mortem debugging. If the Ask for arguments option is enabled in [Settings], Ped will ask for script arguments before execution.
+* Run Script - opens a [File Browser] which lets you choose a script to execute. The standard input/output will be redirected to the [Python Shell] which will be opened first if needed. The script's namespace will be available in the shell after execution for post-mortem debugging. If the Ask for arguments option is enabled in [Settings], Ped will ask for script arguments before execution.
 
 * Tools menu - contains rather rarely used options like [Settings], [Plugins], this help or Orientation, which lets you switch Ped between portrait and landscape mode on 3rd edition devices.
 
-* Exit - closes Ped. Before closing you will be asked if you want to store the current session or close all opened documents first. For more information about the sessions, read the [Sessions] chapter. If you choose the close all files, you will be asked if you want to save changed ones first, if any.
+* Exit - closes Ped. Before closing you will be asked if you want to store the current session or close all opened documents. For more information about sessions, read the [Sessions] chapter. If you choose to close all files, you will be asked if you want to save changed ones first.
 
 $$ Text
 
-All windows displaying text, including this help, add some text specific functions to the [Options] menu.
+So called text windows are all windows displaying text, including this help window. They add some text specific functions to the [Options] menu.
 
 * Edit menu - contains functions used to search through the text including both basic Find and Find All function (searches for all instances of the given text) or Go to Line function.
 
 * Full Screen (Tools menu) - this option hides the top pane (where the icon and file name is displayed) which gives more space for the text. Selecting again shows the top pane again.
 
-The default text window also assigns special functions to some keys.
+A text window also assigns special functions to some keys.
 
 * Select - inserts a new-line, same as Enter if you have a full keyboard.
 * Green-Up/Down - moves one page up/down (see the [Text tab] page of [Settings] dialog for additional information on how to make this function work properly).
@@ -58,7 +58,7 @@ The File menu in the [Options] menu contains additionaly.
 
 $$ Python editor
 
-Python editor is shown after opening a *.py file or creating a new such file. It is based on the [Editor] window and provides all its features. Additionaly it makes editing a Python code on the phone a bit easier.
+Python editor window is shown after opening a *.py file or creating a new such file. It is based on the [Editor] window and provides all its features. Additionaly it makes editing a Python code on the phone a bit easier.
 
 A smart auto-indentation feature is available with a configurable indentation size (see the [Python tab] of the [Settings] dialog).
 
@@ -72,7 +72,7 @@ Once you get your code done and you want to test it, use the Run option from the
 
 $$ Python Shell
 
-Python Shell is opened using the Python Shell option in [Options] menu. It is based on the [Text] window and provides all its capabilities.
+Python Shell window is opened using the Python Shell option in [Options] menu. It is based on the [Text] window and provides all its capabilities.
 
 Python Shell is an interactive Python console replacing (together with the [Run Script] option) the functionality of the default Python Shell distributed with PyS60. It also adds many useful features and doesn't have some of the bugs of the default shell.
 
@@ -92,7 +92,7 @@ The commands history by default contains a command to start a Bluetoth console.
 
 $$ Settings
 
-The settings dialog is opened by selecting Settings from the Tools menu. It lets you customize Ped to your needs. It is divided into several tabs.
+The settings dialog is opened by selecting Settings from the Tools menu (see the [Options] menu). It lets you customize Ped to your needs. Settings dialog is divided into several tabs.
 
 $$$ Main tab
 

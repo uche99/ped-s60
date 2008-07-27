@@ -24,9 +24,11 @@ def page_down(self):
     keypress.simulate_key(EKeyPageDown, EStdKeyPageDown)
     e32.ao_yield()
 
-ped.app.settings.editor.remove('pagesizenorm')
-ped.app.settings.editor.remove('pagesizefull')
-ped.app.settings.editor.remove('pagesizeland')
+# remove unneeded settings
+ped.app.settings.text.remove('pagesizeport')
+ped.app.settings.text.remove('pagesizefull')
+ped.app.settings.text.remove('pagesizeland')
 
+# replace old methods with our
 setattr(ped.TextWindow, 'move_page_up', page_up)
 setattr(ped.TextWindow, 'move_page_down', page_down)
