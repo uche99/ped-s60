@@ -409,6 +409,7 @@ class Screen(object):
                 win._Window__set_keys(win._Window__keys)
         self.__control_key_last = None
 
+    # fired by the control key press (the second key)
     def __control_key_handler(self, key):
         if self.__control_key_timer is None:
             return
@@ -421,8 +422,6 @@ class Screen(object):
             if key in win._Window__keys:
                 win.key_press(key)
             return
-        self.__control_key_timer = e32.Ao_timer()
-        self.__control_key_timer.after(1.0, lambda: self.__control_key_reset(win))
         if win.control_key_press(key):
             # hack to suppress the key press
             def restore(self, body):
@@ -432,6 +431,8 @@ class Screen(object):
                     body.focus = False
             app.body = Canvas()
             schedule(lambda self=self, body=win._Window__body: restore(self, body))
+        self.__control_key_timer = e32.Ao_timer()
+        self.__control_key_timer.after(1.0, lambda: self.__control_key_reset(win))
         self.__control_key_last = key
 
     def __selector(self):

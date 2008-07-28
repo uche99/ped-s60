@@ -1142,11 +1142,10 @@ PythonModifier.py_reset_namespace()
 
 class PythonCodeBrowserWindow(Window, ui.FilteredListboxModifier):
     def __init__(self, **kwargs):
-        lines = pop(kwargs, 'lines')
+        self.tree = pop(kwargs, 'tree')
         kwargs.setdefault('title', '__main__')
         Window.__init__(self, **kwargs)
         ui.FilteredListboxModifier.__init__(self, _('(no match)'))
-        self.tree = self.parse_lines(lines)
         self.set_listbox(self.make_display_list(), self.click)
         self.menu = ui.Menu()
         self.menu.append(ui.MenuItem(_('Select'), target=self.select_click))
@@ -1243,57 +1242,6 @@ class PythonCodeBrowserWindow(Window, ui.FilteredListboxModifier):
             name = name[:-2]
         self.filter_title += u'.%s' % name
         self.set_list(self.make_display_list(), 0)
-
-    # parses Python code represented by lines (as returned by TextWindow.get_lines())
-    # and returns a tree containing all classes and functions defined by this code in
-    # following format:
-    #   {name: (pos, {subname: (subpos, {})}), name2: (pos2, {})}
-    # if name ends with '()' then it is a function
-    def parse_lines(self, lines):
-        flines = []
-        idx = 0
-        for lnum, lpos, ln in lines:
-            t = ln.strip()
-            if not t:
-                continue
-            ind = ln.find(t[0])
-            flines.append((idx, ind, lpos, t))
-            idx += 1
-        end = {u'class' : u'', u'def' : u'()'}
-        last = root = {}
-        lev = [(0, root)] # indent, tree
-        for idx, ind, lpos, ln in flines:
-            t = ln.split()
-            if ind < lev[-1][0]:
-                if idx > 0:
-                    if flines[idx-1][-1][-1] in (u',', u'\\'):
-                        # current line is a continuation of previous line
-                        flines[idx] = (idx, flines[idx-1][1], lpos, ln)
-                        continue
-                    if ind < flines[idx-1][1]:
-                        pln = flines[idx-1][-1]
-                        p = max(pln.find(u"'''"), pln.find(u'"""'))
-                        if p >= 0 and p == max(pln.rfind(u"'''"), pln.rfind(u'"""')):
-                            # current line is a continuation of multiline comment
-                            flines[idx] = (idx, flines[idx-1][1], lpos, ln)
-                            continue
-                try:
-                    while ind < lev[-1][0]:
-                        lev.pop()
-                except IndexError:
-                    # error
-                    return
-            elif ind > lev[-1][0]:
-                lev.append((ind, last))
-            if t[0] in end.keys():
-                tok = t[1].split(u'(')[0].split(u':')[0]
-                name = tok+end[t[0]]
-                if name in lev[-1][1]:
-                    # duped names, append an integer
-                    name = u'%s:%d%s' % (tok, lpos+ind, end[t[0]])
-                last = {}
-                lev[-1][1][name] = (lpos+ind, last)
-        return root
 
 
 class PythonFileWindow(TextFileWindow, PythonModifier):
@@ -1431,7 +1379,7 @@ class PythonFileWindow(TextFileWindow, PythonModifier):
     def codebrowser_click(self):
         name = os.path.splitext(self.title)[0]
         win = PythonCodeBrowserWindow(title=name,
-            lines=self.get_lines())
+            tree=self.parse_lines())
         pos = win.modal(self)
         if pos is not None:
             self.body.set_pos(pos)
@@ -1449,6 +1397,59 @@ class PythonFileWindow(TextFileWindow, PythonModifier):
                     self.set_shortcut(key, items[val])
             else:
                 self.set_shortcut(key, None)
+
+    # parses Python code represented by lines (as returned by self.get_lines())
+    # and returns a tree containing all classes and functions defined by this code in
+    # following format:
+    #   {name: (pos, {subname: (subpos, {})}), name2: (pos2, {})}
+    # if name ends with '()' then it is a function
+    def parse_lines(self, lines=None):
+        if lines is None:
+            lines = self.get_lines()
+        flines = []
+        idx = 0
+        for lnum, lpos, ln in lines:
+            t = ln.strip()
+            if not t:
+                continue
+            ind = ln.find(t[0])
+            flines.append((idx, ind, lpos, t))
+            idx += 1
+        end = {u'class' : u'', u'def' : u'()'}
+        last = root = {}
+        lev = [(0, root)] # indent, tree
+        for idx, ind, lpos, ln in flines:
+            t = ln.split()
+            if ind < lev[-1][0]:
+                if idx > 0:
+                    if flines[idx-1][-1][-1] in (u',', u'\\'):
+                        # current line is a continuation of previous line
+                        flines[idx] = (idx, flines[idx-1][1], lpos, ln)
+                        continue
+                    if ind < flines[idx-1][1]:
+                        pln = flines[idx-1][-1]
+                        p = max(pln.find(u"'''"), pln.find(u'"""'))
+                        if p >= 0 and p == max(pln.rfind(u"'''"), pln.rfind(u'"""')):
+                            # current line is a continuation of multiline comment
+                            flines[idx] = (idx, flines[idx-1][1], lpos, ln)
+                            continue
+                try:
+                    while ind < lev[-1][0]:
+                        lev.pop()
+                except IndexError:
+                    # error
+                    return
+            elif ind > lev[-1][0]:
+                lev.append((ind, last))
+            if t[0] in end.keys():
+                tok = t[1].split(u'(')[0].split(u':')[0]
+                name = tok+end[t[0]]
+                if name in lev[-1][1]:
+                    # duped names, append an integer
+                    name = u'%s:%d%s' % (tok, lpos+ind, end[t[0]])
+                last = {}
+                lev[-1][1][name] = (lpos+ind, last)
+        return root
 
 
 class IOWindow(TextWindow):
