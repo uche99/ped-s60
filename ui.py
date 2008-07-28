@@ -1241,7 +1241,7 @@ class FileBrowserWindow(Window, FilteredListboxModifier):
                 if os.path.isdir(path):
                     note(_('Invalid name'), 'error')
                     continue
-                elif not query(_('Already exists!\nOverwrite?'), 'query'):
+                elif not query(_('Already exists. Overwrite?'), 'query'):
                     continue
             break
         self.add_recent(path)
@@ -1293,7 +1293,7 @@ class FileBrowserWindow(Window, FilteredListboxModifier):
                     if os.path.isdir(dst):
                         note(_('Already exists as a directory'), 'error')
                         continue
-                    if not query(_('Already exists.\nOverwrite?'), 'query'):
+                    if not query(_('Already exists. Overwrite?'), 'query'):
                         continue
                     os.remove(dst)
                 os.rename(src, dst)
