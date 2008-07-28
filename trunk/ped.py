@@ -35,7 +35,7 @@
 
 
 # application version
-__version__ = '2.30.4 beta'
+__version__ = '2.30.5 beta'
 
 
 import sys
@@ -581,25 +581,27 @@ class TextWindow(Window):
         line = self.get_line_from_pos()
         self.set_pos(line[1] + len(line[2]), immediate)
 
-    def move_page_up(self):
+    def get_pagesize(self):
         sett = 'pagesize'
-        if self.orientation == ui.oriLandscape:
+        if self.orientation == ui.oriAutomatic:
+            w, h = ui.layout(ui.EApplicationWindow)[0]
+            if w > h:
+                sett += 'land'
+            else:
+                sett += 'port'
+        elif self.orientation == ui.oriLandscape:
             sett += 'land'
-        elif self.size == ui.sizLarge:
-            sett += 'full'
         else:
-            sett += 'port'
-        self.move_line_up(count=app.settings.text[sett].get()+shift)
+            sett = 'port'
+        if self.size == ui.sizLarge:
+            sett = sett[:-4] + 'full'
+        return app.settings.text[sett].get()
+
+    def move_page_up(self):
+        self.move_line_up(count=self.get_pagesize())
 
     def move_page_down(self):
-        sett = 'pagesize'
-        if self.orientation == ui.oriLandscape:
-            sett += 'land'
-        elif self.size == ui.sizLarge:
-            sett += 'full'
-        else:
-            sett += 'port'
-        self.move_line_down(count=app.settings.text[sett].get()+shift)
+        self.move_line_down(count=self.get_pagesize())
 
     def move_line_up(self, count=1):
         lines = self.get_lines()
