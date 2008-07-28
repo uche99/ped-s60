@@ -335,7 +335,7 @@ class Screen(object):
             win.focus_changed(True)
             reset_inactivity()
             # update screen so the topmost window is visible
-            self.__control_key_reset(fwin)
+            fwin.reset_control_key()
             self.__update_fw()
 
     def __window_close(self, win):
@@ -351,7 +351,7 @@ class Screen(object):
         fwin = self.focused_window()
         if fwin:
             fwin.focus_changed(True)
-        self.__control_key_reset(win)
+        win.reset_control_key()
         self.__update_fw()
 
     def __update_fw(self, mask=_umAll):
@@ -379,11 +379,11 @@ class Screen(object):
         if in_time:
             self.__control_key_timer.cancel()
         self.__control_key_timer = e32.Ao_timer()
-        self.__control_key_timer.after(1.5, lambda: self.__control_key_reset(win))
+        self.__control_key_timer.after(1.5, win.reset_control_key)
         if win is not None and hasattr(win._Window__body, 'focus'):
             win._Window__body.focus = False
         if in_time and self.__control_key_last is None:
-            self.__control_key_reset(win)
+            win.reset_control_key()
             schedule(self.__selector)
             return
         if win is not None:
@@ -394,7 +394,7 @@ class Screen(object):
         self.__control_key_last = None
 
     def __control_key_reset(self, win):
-        # finishes control key processing
+        # finishes control key processing, called by Window.reset_control_key()
         if self.__control_key_timer is not None:
             self.__control_key_timer.cancel()
             self.__control_key_timer = None
@@ -416,7 +416,7 @@ class Screen(object):
         win = self.focused_window()
         self.__control_key_timer.cancel()
         if self.__control_key_last not in (None, key):
-            self.__control_key_reset(win)
+            win.reset_control_key()
             # if this key should be catched not as a control key,
             # notify the window about it
             if key in win._Window__keys:
@@ -432,7 +432,7 @@ class Screen(object):
             app.body = Canvas()
             schedule(lambda self=self, body=win._Window__body: restore(self, body))
         self.__control_key_timer = e32.Ao_timer()
-        self.__control_key_timer.after(1.0, lambda: self.__control_key_reset(win))
+        self.__control_key_timer.after(1.0, win.reset_control_key)
         self.__control_key_last = key
 
     def __selector(self):
@@ -570,8 +570,7 @@ class Window(object):
         pass
 
     def reset_control_key(self):
-        if self.focus:
-            screen._Screen__control_key_reset(self)
+        screen._Screen__control_key_reset(self)
 
     def __set_title(self, title):
         self.__title = title
@@ -603,7 +602,7 @@ class Window(object):
         self.__update_fw(_umOrientation)
 
     def __set_keys(self, keys):
-        keys = list(keys)
+        keys = dict([(x, None) for x in keys]).keys() # remove dups
         try:
             keys.remove(EKeyYes)
         except ValueError:
@@ -611,7 +610,7 @@ class Window(object):
         if self.__body is not None:
             for key in self.__keys:
                 self.__body.bind(key, lambda: None)
-        self.__keys = keys
+        self.__keys = tuple(keys)
         if self.__body is not None:
             def make_key_handler(key):
                 return lambda: self.key_press(key)
@@ -619,12 +618,12 @@ class Window(object):
                 self.__body.bind(key, make_key_handler(key))
 
     def __set_control_keys(self, control_keys):
-        keys = list(control_keys)
+        keys = dict([(x, None) for x in control_keys]).keys() # remove dups
         try:
             keys.remove(EKeyYes)
         except ValueError:
             pass
-        self.__control_keys = keys
+        self.__control_keys = tuple(keys)
 
     def __update_fw(self, mask=_umAll):
         if self.focus:
