@@ -431,8 +431,11 @@ class Screen(object):
                     body.focus = False
             app.body = Canvas()
             schedule(lambda self=self, body=win._Window__body: restore(self, body))
-        self.__control_key_timer = e32.Ao_timer()
-        self.__control_key_timer.after(1.0, win.reset_control_key)
+        # if win.control_key_press() called win.reset_control_key()
+        # self.__control_key_timer will be None
+        if self.__control_key_timer is not None:
+            self.__control_key_timer = e32.Ao_timer()
+            self.__control_key_timer.after(1.0, win.reset_control_key)
         self.__control_key_last = key
 
     def __selector(self):

@@ -1264,9 +1264,9 @@ class PythonFileWindow(TextFileWindow, PythonModifier):
     def control_key_press(self, key):
         if key == ui.EKeySelect:
             self.py_autocomplete()
-        else:
-            return TextFileWindow.control_key_press(self, key)
-        return False
+            self.reset_control_key()
+            return False
+        return TextFileWindow.control_key_press(self, key)
 
     def get_shortcuts(cls):
         menu = TextFileWindow.get_shortcuts()
@@ -1467,6 +1467,8 @@ class IOWindow(TextWindow):
                 # while the len exceeds 3000 chars, we remove first 250
                 while body.len() > 3000:
                     body.delete(0, 250)
+                # update the Text object on screen
+                e32.ao_yield()
             return doflush
         self.do_flush = make_flusher(self.body, self.write_buf)
         self.flush_gate = e32.ao_callgate(self.do_flush)
@@ -1476,6 +1478,7 @@ class IOWindow(TextWindow):
             if self.locked == False:
                 # cause an KeyboardInterrupt in flush()
                 self.interrupt()
+            self.reset_control_key()
             return True
         else:
             return TextWindow.control_key_press(self, key)
@@ -1679,6 +1682,7 @@ class PythonShellWindow(IOWindow, PythonModifier):
                 return IOWindow.control_key_press(self, key)
         elif key == ui.EKeySelect:
             self.py_autocomplete()
+            self.reset_control_key()
         else:
             return IOWindow.control_key_press(self, key)
         return False
