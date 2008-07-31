@@ -1107,14 +1107,14 @@ class FileBrowserWindow(Window, FilteredListboxModifier):
 
     def make_menu(self):
         menu = Menu()
+        if self.mode == fbmSave and self.path != '' and not self.path.startswith(':'):
+            menu.append(MenuItem(_('Save here...'), target=self.save_click))
         menu.append(MenuItem(_('Open'), target=self.select_click))
         if self.path.startswith(':'):
             menu.append(MenuItem(_('Drives'), target=self.drives_click))
             if self.path == ':recents':
                 menu.append(MenuItem(_('Delete'), target=self.delete_click))
         elif self.path != '':
-            if self.mode == fbmSave:
-                menu.append(MenuItem(_('Save here...'), target=self.save_click))
             menu.append(MenuItem(_('Parent'), target=self.parent_click))
             menu.append(MenuItem(_('Drives'), target=self.drives_click))
             menu.append(MenuItem(_('Rename'), target=self.rename_click))

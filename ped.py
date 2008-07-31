@@ -907,14 +907,75 @@ class PythonModifier(object):
         d = self._get_objects(exp)
         try:
             # if rfind() returns -1 then we will get whole <exp>
-            return d[exp[exp.rfind('.')+1]]
+            return d[exp[exp.rfind('.')+1:]]
         except:
             pass
+
+    def _get_expression(self, text=None, pos=None):
+        if text is None or pos is None:
+            ttext, tpos = self._get_text()
+            if text is None:
+                text = ttext
+            if pos is None:
+                pos = tpos
+        begpos = pos
+
+        brackets = {u'(': u')', u'[': u']', u'{': u'}'}
+        brstack = []
+        quote = u''
+        
+        # parse back to get the expression
+        pos -= 1; lastc = lastnwc = ''
+        while pos >= 0:
+            c = text[pos]
+            if c in u'"\'': # eat everything inside quotes
+                if not quote:
+                    quote = c
+                elif c == quote and (pos == 0 or text[pos-1] != u'\\'):
+                    quote = ''
+            elif not quote:
+                if c in brackets.values(): # eat everything inside brackets
+                    if lastnwc.isalnum() or lastnwc in (u'', u'_'):
+                        # bracket followed by an id-char or cursor
+                        break
+                    brstack.append(c)
+                elif c in brackets.keys():
+                    if not brstack: # opening bracket, stop
+                        break
+                    if brstack.pop() != brackets[c]: # unmatched brackets, stop
+                        break
+                elif not brstack:
+                    if c.isalnum() or c in u'._':
+                        if lastc.isspace():
+                            if lastnwc not in (u'', u'.') or c != u'.':
+                                break
+                    elif not c.isspace():
+                        break
+            lastc = c
+            if not c.isspace():
+                lastnwc = c
+            pos -= 1
+        pos += 1
+
+        try:
+            return text[pos:begpos].lstrip().translate({0x2028: 0x2029, 0xa0: 0x20}).replace(u'\u2029',
+                u'\n').encode('latin1')
+        except UnicodeError:
+            return ''
+
+    def _expression_to_title(self, exp):
+        r = exp.replace('\n', ' ')
+        title = ''
+        while title != r:
+            title = r
+            r = title.replace('  ', ' ')
+        return title.strip().decode('latin1')
 
     def py_insert_indent(self):
         text, pos = self._get_text()
         pos -= 1
         i = pos-1
+
         # walk back to the start of line
         while i >= 0:
             if text[i] in (u'\u2028', u'\u2029'):
@@ -922,9 +983,11 @@ class PythonModifier(object):
             i -= 1
         i += 1
         strt = i
+
         # walk forward to the start of text
         while i < pos and text[i].isspace():
             i += 1
+
         # calculate indent of the previous line
         ind = i-strt
         if pos > 0:
@@ -947,46 +1010,12 @@ class PythonModifier(object):
         self.body.add(u' '*ind)
 
     def py_autocomplete(self):
-        text, pos = self._get_text()
-        begpos = pos
-
-        brackets = {'(': ')', '[': ']', '{': '}'}
-        brstack = []
-        quote = ''
-        
         # parse back to get the expression
-        pos -= 1; lastc = lastid = ''
-        while pos >= 0:
-            c = text[pos]
-            if c in '"\'': # eat everything inside quotes
-                if not quote:
-                    quote = c
-                elif c == quote and (pos == 0 or text[pos-1] != '\\'):
-                    quote = ''
-            elif not quote:
-                if c in brackets.values(): # eat everything inside brackets
-                    brstack.append(c)
-                elif c in brackets.keys():
-                    if not brstack: # opening bracket, stop
-                        break
-                    if brstack.pop() != brackets[c]: # unmatched brackets, stop
-                        break
-                elif not brstack:
-                    if c.isalnum() or c in '._':
-                        # if last char was a space which wasn't preceeded by a dot, stop
-                        if lastc.isspace() and lastid not in ('', '.'):
-                            break
-                        lastid = c
-                    elif not c.isspace():
-                        break
-            lastc = c
-            pos -= 1
-        pos += 1
-
-        exp = text[pos:begpos].lstrip()
+        exp = self._get_expression()
 
         # build the menu
-        menu = ui.Menu('%s*' % exp)
+        
+        menu = ui.Menu('%s*' % self._expression_to_title(exp))
         menu.extend([ui.MenuItem(title) for title in self._get_objects(exp).keys()])
         menu.extend([ui.MenuItem(title, offset=off) for title, off in statements \
             if title.startswith(exp)])
@@ -1013,6 +1042,7 @@ class PythonModifier(object):
     def py_calltip(self):
         stdhelp = _('Put cursor inside argument parenthesis')
         text, pos = self._get_text()
+        
         # search back to opening bracket
         pos -= 1
         lev = 0
@@ -1027,6 +1057,7 @@ class PythonModifier(object):
         else:
             ui.note(stdhelp)
             return
+        
         # search back to non-space chars
         while pos >= 0:
             if not text[pos].isspace():
@@ -1035,25 +1066,22 @@ class PythonModifier(object):
         else:
             ui.note(stdhelp)
             return
-        # extract the name
-        i = pos
-        pos -= 1
-        while pos >= 0:
-            if not (text[pos].isalnum() or text[pos] in u'._'):
-                break
-            pos -= 1
-        name = text[pos+1:i]
-        if name:
+        
+        # extract the expression
+        exp = self._get_expression(text, pos)
+        
+        if exp:
+            title = self._expression_to_title(exp)
             try:
                 from globalui import global_msg_query
                 win = None
             except ImportError:
-                win = AutocloseTextWindow(title=_('Call Tip'))
+                win = AutocloseTextWindow(title=u'%s - %s' % (_('Call Tip'), title))
                 menu = ui.Menu()
                 menu.append(ui.MenuItem(_('Close'), target=win.close))
                 win.menu = menu
             # try to get the object
-            obj = self._get_object(name)
+            obj = self._get_object(exp)
             if obj is not None:
                 # check the type of the object and try to obtain the function object
                 import types
@@ -1089,7 +1117,7 @@ class PythonModifier(object):
                             items.append('...')
                         if fob.func_code.co_flags & 0x8:
                             items.append('***')
-                        arg_text = '%s(%s)' % (name, ', '.join(items))
+                        arg_text = '%s(%s)' % (title, ', '.join(items))
                     except:
                         pass
                 doc = getattr(obj, '__doc__', '')
@@ -1097,7 +1125,7 @@ class PythonModifier(object):
                     while doc[:1] in ' \t\n':
                         doc = doc[1:]
                     if not arg_text:
-                        arg_text = name
+                        arg_text = title
                     arg_text += '\n\n' + doc
                 if arg_text:
                     text = unicode(arg_text)
@@ -1107,19 +1135,19 @@ class PythonModifier(object):
                     else:
                         # we use a timer to let the screen refresh if we were called
                         # from a shortcut; if we won't do it, the Text control text
-                        # will not be visible
+                        # will not be visible while the popup remains open
                         timer = e32.Ao_timer()
                         def timerhandler(timer):
-                            global_msg_query(text, _('Call Tip') + u' - ' + name)
+                            global_msg_query(text, u'%s - %s' % (_('Call Tip'), title))
                         timer.after(0.0, lambda: timerhandler(timer))
                 else:
                     if win:
                         win.close()
-                    ui.note(_('No additional info for "%s"') % name)
+                    ui.note(_('No additional info for "%s"') % title)
             else:
                 if win:
                     win.close()
-                ui.note(_('Unknown callable "%s"') % name)
+                ui.note(_('Unknown callable "%s"') % title)
             if win and not win.is_closed():
                 win.body.set_pos(0)
                 win.open()
