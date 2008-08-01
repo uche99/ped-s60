@@ -342,8 +342,9 @@ class Screen(object):
         # called internally by Window.close()
         fwin = self.focused_window()
         self.windows.remove(win)
-        for w in [w for w in self.windows if w._Window__overlapped == win]:
-            w._Window__overlapped = None
+        for w in self.windows:
+            if w._Window__overlapped == win:
+                w._Window__overlapped = None
         if win == self.rootwin:
             self.rootwin = None
         if fwin == win:
@@ -553,7 +554,7 @@ class Window(object):
             assert self.__modal_event is None, 'modal() already in progress'
             self.__modal_event = Event()
             self.focus = True
-            if owner:
+            if owner is not None:
                 state = owner.overlapped, self.selector
                 owner.overlapped = self
                 self.selector = False
@@ -701,23 +702,25 @@ class BlankWindow(Window):
             self.close()
 
 
-class Tab(object):
+class WindowTab(object):
     def __init__(self, **kwargs):
-        # title=None, body=None, menu=None, keys=None, control_keys=None
         self.__title = pop(kwargs, 'title', self.__class__.__name__)
         self.__menu = pop(kwargs, 'menu', Menu())
         self.__body = pop(kwargs, 'body', None)
         self.__keys = pop(kwargs, 'keys', ())
         self.__control_keys = pop(kwargs, 'control_keys', ())
-        # window attribute is set by TabbedWindow.__set_tabs()
+        # window attribute is set by attach()
         self.window = None
         if kwargs:
-            raise TypeError('Tab.__init__() got an unexpected keyword argument(s): %s' % \
+            raise TypeError('WindowTab.__init__() got an unexpected keyword argument(s): %s' % \
                 ', '.join([repr(x) for x in kwargs.keys()]))
+
+    def attach(self, window):
+        self.window = window
 
     def __set_window_property(self, prop, value):
         if self.window is not None:
-            if self.window.tab == self:
+            if self.window.current_tab == self:
                 setattr(self.window, prop, value)
 
     def __set_title(self, title):
@@ -753,7 +756,7 @@ class TabbedWindow(Window):
         tabs = pop(kwargs, 'tabs', ())
         Window.__init__(self, **kwargs)
         self.__tabs = ()
-        self.__active_tab = -1
+        self.__current_tab = -1
         if tabs:
             self.__set_tabs(tabs)
 
@@ -761,7 +764,7 @@ class TabbedWindow(Window):
         Window.focus_changed(self, focus)
         if focus and self.tabs:
             app.set_tabs([unicode(x.title) for x in self.tabs], self.__tab_changed)
-            app.activate_tab(self.__active_tab)
+            app.activate_tab(self.__current_tab)
         else:
             app.set_tabs([], None)
 
@@ -769,8 +772,8 @@ class TabbedWindow(Window):
         pass
 
     def __update_win(self):
-        if self.__active_tab >= 0:
-            tab = self.__tabs[self.__active_tab]
+        if self.__current_tab >= 0:
+            tab = self.__tabs[self.__current_tab]
             self._Window__keys = tab.keys
             self._Window__control_keys = tab.control_keys
             self._Window__body = None
@@ -783,8 +786,8 @@ class TabbedWindow(Window):
             self.menu = Menu()
 
     def __tab_changed(self, n):
-        prev = self.tab
-        self.__active_tab = n
+        prev = self.current_tab
+        self.__current_tab = n
         self.__update_win()
         e32.ao_yield()
         self.tab_changed(prev)
@@ -794,27 +797,27 @@ class TabbedWindow(Window):
         different = (self.__tabs != tabs)
         if different:
             try:
-                prev = self.tab
+                prev = self.current_tab
             except IndexError:
                 prev = None
             self.__tabs = tabs
-            if len(tabs) <= self.__active_tab:
-                self.__active_tab = len(tabs) - 1
-            elif self.__active_tab < 0:
-                self.__active_tab = 0
+            if len(tabs) <= self.__current_tab:
+                self.__current_tab = len(tabs) - 1
+            elif self.__current_tab < 0:
+                self.__current_tab = 0
             for tab in tabs:
-                tab.window = self
+                tab.attach(self)
         if self.focus:
             if tabs:
                 app.set_tabs([unicode(x.title) for x in tabs], self.__tab_changed)
-                app.activate_tab(self.__active_tab)
+                app.activate_tab(self.__current_tab)
             else:
                 app.set_tabs([], None)
         self.__update_win()
         if different:
             self.tab_changed(prev)
 
-    def __set_active_tab(self, n):
+    def __set_current_tab(self, n):
         if n >= len(self.tabs):
             n = len(self.tabs) - 1
         elif n < 0:
@@ -823,9 +826,9 @@ class TabbedWindow(Window):
         if self.focus:
             app.activate_tab(n)
 
-    tab = property(lambda self: self.__tabs[self.__active_tab])
+    current_tab = property(lambda self: self.__tabs[self.__current_tab])
     tabs = property(lambda self: self.__tabs, __set_tabs)
-    active_tab = property(lambda self: self.__active_tab, __set_active_tab)
+    current_tab_index = property(lambda self: self.__current_tab, __set_current_tab)
 
 
 # subclass together with Window to get a Listbox window with user items filtering
@@ -902,6 +905,8 @@ class FilteredListboxModifier(object):
     # changes current filter, pass None to show all
     def set_filter(self, filter):
         if filter is None:
+            if self.__filter is None:
+                return
             act = self.current()
             self.__filter = None
             self.filter_menu_item.title = _('Edit filter...')
@@ -979,10 +984,10 @@ class FileBrowserWindow(Window, FilteredListboxModifier):
                 self.icons[name] = Icon(path, mbm, mbm+1)
         FilteredListboxModifier.__init__(self, (_('(no match)'), self.icons['info']))
         self.gtitle = self.filter_title
-        self.settings = Settings(self.settings_path)
+        self.settings = SettingsGroup(filename=self.settings_path)
         self.settings.append('main', SettingsGroup())
         self.settings.main.append('recents', Setting('Recents', []))
-        self.settings.load_if_available()
+        self.settings.try_to_load()
         self.filter_nomatch_item = (_('(no match)'), self.icons['info'])
         self.set_listbox([(_('(empty)'), self.icons['info'])], self.select_click)
         self.keys += (EKeyLeftArrow, EKeyRightArrow, EKey0, EKeyHash, EKeyBackspace)
@@ -1359,23 +1364,12 @@ class Setting(object):
     def __init__(self, title, value):
         self.title = title
         self.value = value
-        self.original = value
-        self.hidden = False
-
-    def changed(self):
-        return self.original != self.value
-
-    def store(self):
-        self.original = self.value
-
-    def restore(self):
-        self.value = self.original
 
     def get(self):
         return self.value
 
     def set(self, value):
-        self.value = self.original = value
+        self.value = value
 
     def edit(self, owner=None):
         return False
@@ -1650,29 +1644,9 @@ class GroupSetting(Setting):
         if value is None:
             value = SettingsGroup(title)
         Setting.__init__(self, title, value)
-        self.original = self.value.items()
         if item_title is None:
             item_title = _('Name')
         self.item_title = item_title
-        
-    def changed(self):
-        if len(self.value) != len(self.original):
-            return True
-        for item in self.value.values():
-            if item.changed():
-                return True
-        return False
-
-    def store(self):
-        for item in self.value.values():
-            item.store()
-        self.original = self.value.items()
-
-    def restore(self):
-        self.value.clear()
-        for name, item in self.original:
-            self.value.append(name, item)
-            item.restore()
 
     def get(self):
         return dict([(name, item.get()) \
@@ -1685,15 +1659,11 @@ class GroupSetting(Setting):
             if setting is not None:
                 self.value.append(name, setting)
         self.value.sort()
-        self.original = self.value.items()
 
     def edit(self, owner=None):
         items = self.value.items()
-        changed = GroupSettingWindow(title=self.title,
+        return GroupSettingWindow(title=self.title,
             setting=self).modal(owner)
-        if changed:
-            self.original = items
-        return changed
 
     def to_item(self, setting):
         if setting is not None:
@@ -1719,46 +1689,6 @@ class GroupSetting(Setting):
         
     def __unicode__(self):
         return unicode(_('%s item(s)') % len(self.value))
-                
-
-class ShortkeySettingWindow(Window):
-    def __init__(self, **kwargs):
-        self.value = pop(kwargs, 'value', None)
-        text = pop(kwargs, 'text', None)
-        Window.__init__(self, **kwargs)
-        self.body = Text()
-        if text is not None:
-            self.body.add(unicode(text))
-        else:
-            self.body.add(u'%s\n\n%s\n' % \
-                (_('Press a new shortkey (green key followed by a 0-9, * or # key) or close this window to cancel.'),
-                _('Current setting: %s') % self.value))
-        self.menu.append(MenuItem(_('Exit'), target=self.close))
-        self.control_keys = (EKey0, EKey1, EKey2, EKey3, EKey4, EKey5, EKey6, EKey7, EKey8,
-            EKey9, EKey0, EKeyStar, EKeyHash)
-
-    def control_key_press(self, key):
-        self.modal_result = key
-        self.close()
-
-
-class ShortkeySetting(Setting):
-    def __init__(self, title, value=EKey1):
-        Setting.__init__(self, title, value)
-
-    def edit(self, owner=None):
-        key = ShortkeySettingWindow(title=self.title,
-            value=self).modal(owner)
-        if key is not None:
-            self.value = key
-            return True
-        return False
-
-    def __str__(self):
-        return str(self.__unicode__())
-
-    def __unicode__(self):
-        return _('Green + %s') % unichr(self.value)
 
 
 class CustomSetting(Setting):
@@ -1774,16 +1704,21 @@ class CustomSetting(Setting):
 
 
 class SettingsGroup(object):
-    def __init__(self, title=None, info=None):
+    '''Groups together a set of settings or settings groups in
+    an ordered list.
+    '''
+    
+    def __init__(self, title=None, info=None, filename=None):
         if title is None:
             title = self.__class__.__name__
         self.title = title
         if info is None:
             info = _('(more options)')
         self.info = info
+        self.filename = filename
         self.objs = {}
         self.order = []
-        self.hidden = False
+        self.window = None
 
     def append(self, name, obj):
         if isinstance(obj, (SettingsGroup, Setting)):
@@ -1825,12 +1760,77 @@ class SettingsGroup(object):
         return self
         
     def set(self, value):
-        raise AttributeError('Cannot set a SettingsGroup (to %s)' % repr(value))
+        raise AttributeError('cannot set a SettingsGroup (to %s)' % repr(value))
 
     def sort(self):
         def compare(a, b):
             return -(unicode(self.objs[a].title).lower() < unicode(self.objs[b].title).lower())
         self.order.sort(compare)
+
+    def edit(self, owner=None):
+        if self.window:
+            self.window.focus = True
+            return False
+        self.window = SettingsGroupWindow(title=self.title,
+            group=self)
+        r = self.window.modal(owner)
+        self.window = None
+        return r
+
+    def set_filename(self, filename):
+        self.filename = filename
+
+    def load(self):
+        if self.filename is None:
+            raise ValueError('filename not set')
+        import marshal
+        f = file(self.filename, 'rb')
+        while True:
+            try:
+                # all versions of the file had name-value pairs
+                name = marshal.load(f)
+                value = marshal.load(f)
+                obj = self
+                try:
+                    for part in name.split('/'):
+                        try:
+                            part = int(part)
+                        except ValueError:
+                            pass
+                        obj = obj[part]
+                except KeyError:
+                    # old settings / old file version
+                    pass
+                else:
+                    obj.set(value)
+            except EOFError:
+                break
+        f.close()
+
+    def save(self):
+        if self.filename is None:
+            raise ValueError('filename not set')
+        import marshal
+        def save_group(f, group, path=''):
+            for name, obj in group.items():
+                if path:
+                    curpath = '%s/%s' % (path, name)
+                else:
+                    curpath = name
+                if isinstance(obj, SettingsGroup): # SettingsGroup
+                    save_group(f, obj, curpath)
+                else: # Setting
+                    marshal.dump(curpath, f)
+                    marshal.dump(obj.get(), f)
+        f = file(self.filename, 'wb')
+        save_group(f, self)
+        f.close()
+
+    def try_to_load(self):
+        try:
+            self.load()
+        except IOError:
+            pass
 
     def __getitem__(self, name):
         return self.objs[name]
@@ -1859,6 +1859,9 @@ class SettingsGroup(object):
     def __len__(self):
         return len(self.objs)
         
+    def __nonzero__(self):
+        return not not self.objs
+        
     def __str__(self):
         return str(self.info)
 
@@ -1866,71 +1869,21 @@ class SettingsGroup(object):
         return unicode(self.info)
 
 
-class Settings(SettingsGroup):
-    def __init__(self, filename, title=None):
-        if title is None:
-            title = _('Settings')
-        SettingsGroup.__init__(self, title)
-        self.filename = filename
-        self.window = None
-
-    def set_filename(self, filename):
-        self.filename = filename
-
-    def load(self):
-        import marshal
-        f = file(self.filename, 'rb')
-        while True:
-            try:
-                # all versions of the file had name-value pairs
-                name = marshal.load(f)
-                value = marshal.load(f)
-                obj = self
-                try:
-                    for part in name.split('/'):
-                        try:
-                            part = int(part)
-                        except ValueError:
-                            pass
-                        obj = obj[part]
-                except KeyError:
-                    # old settings / old file version
-                    pass
-                else:
-                    obj.set(value)
-            except EOFError:
-                break
-        f.close()
-
-    def save(self):
-        import marshal
-        def save_group(f, group, path=''):
-            for name, obj in group.items():
-                if path:
-                    curpath = '%s/%s' % (path, name)
-                else:
-                    curpath = name
-                if isinstance(obj, SettingsGroup): # SettingsGroup
-                    save_group(f, obj, curpath)
-                else: # Setting
-                    marshal.dump(curpath, f)
-                    marshal.dump(obj.get(), f)
-        f = file(self.filename, 'wb')
-        save_group(f, self)
-        f.close()
-
-    def load_if_available(self):
-        try:
-            self.load()
-        except IOError:
-            pass
+class SettingsGroups(SettingsGroup):
+    '''Same as SettingGroup but does not support settings, only
+    settings groups. The advantage is that that a TabbedWindow
+    is used to edit these groups.
+    '''
+    
+    def __init__(self, *args, **kwargs):
+        SettingsGroup.__init__(self, *args, **kwargs)
 
     def edit(self, owner=None):
         if self.window:
             self.window.focus = True
             return False
-        self.window = SettingsWindow(settings=self,
-            title=self.title)
+        self.window = SettingsGroupsWindow(title=self.title,
+            group=self)
         r = self.window.modal(owner)
         self.window = None
         return r
@@ -1941,102 +1894,94 @@ class Settings(SettingsGroup):
         else:
             raise TypeError('\'obj\' must be a SettingsGroup object')
 
-    def get(self):
-        raise TypeError('method not implemented')
-        
-    def set(self, value):
-        raise TypeError('method not implemented')
-
-
-class SettingsWindow(TabbedWindow):
+    
+class SettingsGroupWindow(Window):
     def __init__(self, **kwargs):
-        kwargs.setdefault('title', _('Settings'))
-        self.settings = pop(kwargs, 'settings')
-        TabbedWindow.__init__(self, **kwargs)
-        self.maintitle = self.title
-        menu = Menu()
-        menu.append(MenuItem(_('Change'), target=self.change_click))
-        menu.append(MenuItem(_('Save'), target=self.save_click))
-        menu.append(MenuItem(_('Exit'), target=self.close))
-        tabs = []
-        for gname, group in self.settings.items():
-            if group.hidden:
-                continue
-            if len(group) == 0:
-                continue
-            tab = Tab(title=group.title, menu=menu)
-            tab.group = group
-            tab.body = Listbox(self.get_list(group),
-                self.change_click)
-            tab.stack = []
-            tabs.append(tab)
-        if not tabs:
-            raise RuntimeError('No settings to edit')
-        self.tabs = tabs
+        self.group = pop(kwargs, 'group')
+        Window.__init__(self, **kwargs)
+        self.body = Listbox(self.get_list(), self.select_click)
+        self.menu.append(MenuItem(_('Change'), target=self.select_click))
+        self.menu.append(MenuItem(_('Exit'), target=self.exit_click))
         self.modal_result = False
+        
+    def get_list(self):
+        return [(unicode(x.title), unicode(x)) \
+            for x in self.group.values() if x]
+        
+    def select_click(self):
+        if self.group.values()[self.body.current()].edit(self):
+            self.body.set_list(self.get_list(), self.body.current())
+            self.modal_result = True
 
-    def get_list(self, group):
-        return [(unicode(item.title), unicode(item)) \
-            for name, item in group.items() if not item.hidden]
+    def close(self, exit=False):
+        if exit:
+            owners = [win for win in screen.windows \
+                if win.overlapped is self and \
+                isinstance(win, (SettingsGroupWindow, SettingsTabsWindow))]
+            Window.close(self)
+            for win in owners:
+                win.close(exit=True)
+        else:
+            Window.close(self)
+        
+    def exit_click(self):
+        self.close(exit=True)
 
-    def get_changed(self, group=None):
-        if group is None:
-            group = self.settings
-        items = []
-        for name, obj in group.items():
-            if isinstance(obj, SettingsGroup): # SettingsGroup
-                items.extend(self.get_changed(obj))
-            elif obj.changed(): # Setting
-                items.append(obj)
-        return items
 
-    def can_close(self):
-        tab = self.tab
-        if tab.stack:
-            tab.group, tab.body = tab.stack.pop()
-            tab.title = tab.group.title
-            return False
-        if not TabbedWindow.can_close(self):
-            return False
-        items = self.get_changed()
-        if items:
-            if query(_('Save changes?'), 'query'):
-                for item in items:
-                    item.store()
-                self.settings.save()
-                self.modal_result = True
-            else:
-                for item in items:
-                    item.restore()
-        return True
+class SettingsTab(WindowTab):
+    def __init__(self, **kwargs):
+        self.group = pop(kwargs, 'group')
+        WindowTab.__init__(self, **kwargs)
+        self.body = Listbox(self.get_list(), self.select_click)
+        self.menu.append(MenuItem(_('Change'), target=self.select_click))
+        self.menu.append(MenuItem(_('Exit'), target=self.exit_click))
 
-    def tab_changed(self, prev):
-        TabbedWindow.tab_changed(self, prev)
-        if prev is not None and prev.stack:
-            prev.group, prev.body = prev.stack[0]
-            prev.title = prev.group.title
-            prev.stack = []
+    def get_list(self):
+        return [(unicode(x.title), unicode(x)) \
+            for x in self.group.values() if x]
+        
+    def select_click(self):
+        if self.group.values()[self.body.current()].edit(self.window):
+            self.body.set_list(self.get_list(), self.body.current())
+            self.window.modal_result = True
 
-    def change_click(self):
-        tab = self.tab
-        obj = tab.group.items()[tab.body.current()][-1]
-        if isinstance(obj, SettingsGroup): # SettingsGroup
-            tab.stack.append((tab.group, tab.body))
-            tab.title = obj.title
-            tab.group = obj
-            tab.body = Listbox(self.get_list(obj),
-                self.change_click)
-        else: # Setting
-            if obj.edit(self):
-                tab.body.set_list(self.get_list(tab.group),
-                    tab.body.current())
+    def exit_click(self):
+        self.window.close(exit=True)
 
-    def save_click(self):
-        for item in self.get_changed():
-            item.store()
-        self.settings.save()
-        self.modal_result = True
-        note(_('Changes saved'), 'conf')
+
+class SettingsTabsWindow(TabbedWindow):
+    def __init__(self, **kwargs):
+        self.group = pop(kwargs, 'group')
+        active = pop(kwargs, 'active', 0)
+        TabbedWindow.__init__(self, **kwargs)
+        self.modal_result = False
+        self.tabs = [SettingsTab(title=x.title,
+            group=x) for x in self.group.values() if len(x) > 0]
+        self.current_tab_index = active
+        
+    def close(self, exit=False):
+        if exit:
+            owners = [win for win in screen.windows \
+                if win.overlapped is self and \
+                isinstance(win, (SettingsGroupWindow, SettingsTabsWindow))]
+            TabbedWindow.close(self)
+            for win in owners:
+                win.close(exit=True)
+        else:
+            TabbedWindow.close(self)
+
+
+class SettingsGroupsWindow(SettingsGroupWindow):
+    def __init__(self, **kwargs):
+        SettingsGroupWindow.__init__(self, **kwargs)
+        self.menu[0].title = _('Open') # replaces 'Change'
+
+    def select_click(self):
+        win = SettingsTabsWindow(title=self.title,
+            group=self.group,
+            active=self.body.current())
+        if win.modal(self):
+            self.modal_result = True
 
 
 class Translator(object):
@@ -2066,7 +2011,7 @@ class Translator(object):
                     self.translations[x.keys()[0]] = dst
         f.close()
 
-    def load_if_available(self, filename):
+    def try_to_load(self, filename):
         try:
             self.load(filename)
         except IOError:
