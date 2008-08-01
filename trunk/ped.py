@@ -664,9 +664,8 @@ class FindResultsWindow(Window):
 class TextFileWindow(TextWindow):
     type_name = 'Text'
     type_ext = '.txt'
-    session = ui.Settings('TextFileWindow.session')
-    session.append('main', ui.SettingsGroup())
-    session.main.append('windows', ui.Setting('TextFileWindows', []))
+    session = ui.SettingsGroup()
+    session.append('windows', ui.Setting('', []))
 
     def __init__(self, **kwargs):
         try:
@@ -825,7 +824,7 @@ class TextFileWindow(TextWindow):
                 return
 
     def store_session(cls):
-        windows = cls.session.main.windows
+        windows = cls.session.windows
         del windows[:]
         for win in ui.screen.find_windows(TextFileWindow):
             try:
@@ -847,7 +846,7 @@ class TextFileWindow(TextWindow):
     store_session = classmethod(store_session)
 
     def clear_session(cls):
-        del cls.session.main.windows[:]
+        del cls.session.windows[:]
         cls.session.save()
     clear_session = classmethod(clear_session)
 
@@ -1251,6 +1250,7 @@ class PythonCodeBrowserWindow(Window, ui.FilteredListboxModifier):
         except IndexError:
             return
         pos = [self.tree[name][-1] for name in self.make_list()].index(oldtree)
+        self.set_filter(None)
         self.filter_title = self.filter_title[:self.title.rindex(u'.')]
         self.set_list(self.make_display_list(), pos)
         
@@ -1268,6 +1268,7 @@ class PythonCodeBrowserWindow(Window, ui.FilteredListboxModifier):
         self.tree = newtree
         if name.endswith('()'):
             name = name[:-2]
+        self.set_filter(None)
         self.filter_title += u'.%s' % name
         self.set_list(self.make_display_list(), 0)
 
@@ -2246,17 +2247,17 @@ class Application(object):
         alllanguages.sort(lambda a, b: -(a.lower() < b.lower()))
         # we have to load the language setting first; the real settings object
         # we will use in the app will be created later
-        settings = ui.Settings(os.path.join(self.path, 'settings.bin'))
+        settings = ui.SettingsGroups(filename=os.path.join(self.path, 'settings.bin'))
         settings.append('main', ui.SettingsGroup())
         settings.main.append('language', ui.ChoiceSetting('Language', u'English', alllanguages))
-        settings.load_if_available()
+        settings.try_to_load()
         self.language = settings.main.language.encode('utf8')
         if self.language != 'English':
             # load the ped language file
-            translator.load_if_available(os.path.join(path, self.language))
+            translator.try_to_load(os.path.join(path, self.language))
             # load the ui language file
             path = os.path.join(self.path, 'lang\\ui')
-            ui.translator.load_if_available(os.path.join(path, self.language))
+            ui.translator.try_to_load(os.path.join(path, self.language))
 
         # setup settings
         allfonts = ui.available_text_fonts()
@@ -2265,12 +2266,12 @@ class Application(object):
         else:
             defaultfont = allfonts[0]
         allcolors = ((_('Black'), 0x000000), (_('Red'), 0x990000), (_('Green'), 0x008800), (_('Blue'), 0x000099), (_('Purple'), 0x990099))
-        settings = ui.Settings(os.path.join(self.path, 'settings.bin'), title=_('Settings'))
-        settings.append('main', ui.SettingsGroup(_('Main')))
-        settings.append('text', ui.SettingsGroup(_('Text')))
-        settings.append('file', ui.SettingsGroup(_('File')))
-        settings.append('python', ui.SettingsGroup(_('Python')))
-        settings.append('plugins', ui.SettingsGroup(_('Plugins')))
+        settings = ui.SettingsGroups(filename=os.path.join(self.path, 'settings.bin'), title=_('Settings'))
+        settings.append('main', ui.SettingsGroup(_('Main'), _('Global settings')))
+        settings.append('text', ui.SettingsGroup(_('Text'), _('Text windows settings')))
+        settings.append('file', ui.SettingsGroup(_('File'), _('File windows settings')))
+        settings.append('python', ui.SettingsGroup(_('Python'), _('Python settings')))
+        settings.append('plugins', ui.SettingsGroup(_('Plugins'), _('Plugins settings')))
         settings.main.append('language', ui.ChoiceSetting(_('Language'), u'English', alllanguages))
         settings.main.append('shortcuts', ShortcutsGroupSetting(_('Global shortcuts'), RootWindow))
         settings.text.append('fontname', ui.ChoiceSetting(_('Font name'), defaultfont, allfonts))
@@ -2351,7 +2352,7 @@ class Application(object):
                 sys.path.append(path)
 
         # load and apply settings
-        self.settings.load_if_available()
+        self.settings.try_to_load()
         self.apply_settings()
 
         # open root ui window (desktop)
@@ -2386,8 +2387,8 @@ class Application(object):
         # running until appuifw.app.set_exit() is called (see: RootWindow.close)
 
     def restore_session(self):
-        TextFileWindow.session.load_if_available()
-        windows = TextFileWindow.session.main.windows
+        TextFileWindow.session.try_to_load()
+        windows = TextFileWindow.session.windows
         if windows and ui.query(_('Restore previous session?'), 'query'):
             for path, text, encoding, pos in windows:
                 if text is None:
@@ -2456,7 +2457,7 @@ class Application(object):
         if len(self.settings.allkeys()) != slen:
             # plugins have added/removed the settings;
             # reload so the new settings are loaded too
-            self.settings.load_if_available()
+            self.settings.try_to_load()
             self.apply_settings()
 
         ui.screen.redraw()
@@ -2484,6 +2485,7 @@ class Application(object):
 
     def settings_click(self):
         if self.settings.edit():
+            self.settings.save()
             self.apply_settings()
 
     def apply_settings(self):
@@ -2823,7 +2825,7 @@ def get_plugin_translator(plugin_path):
         plugin_path = os.path.split(plugin_path)[0]
     path = os.path.join(plugin_path, 'lang\\' + app.language)
     trans = ui.Translator()
-    translator.load_if_available(path)
+    translator.try_to_load(path)
     return trans
 
 
