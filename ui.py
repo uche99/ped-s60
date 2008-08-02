@@ -1745,7 +1745,7 @@ class SettingsGroup(object):
             keys.append(name)
             obj = self.objs[name]
             if isinstance(obj, SettingsGroup):
-                keys.extend(obj.allkeys())
+                keys.append(obj.allkeys())
         return keys
 
     def items(self):
