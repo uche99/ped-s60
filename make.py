@@ -184,12 +184,18 @@ def listfiles(folder):
         if os.path.isfile(os.path.join(folder, x))]
 
 def system(cmds, **envargs):
+    oldenv = os.environ.copy()
     os.environ.update(envargs)
     for c in cmds.splitlines():
         c = c.strip()
         if not c.startswith('#'):
             print c
             os.system(c)
+    for name in envargs.keys():
+        try:
+            os.environ[name] = oldenv[name]
+        except KeyError:
+            del os.environ[name]
 
 def verstr():
     if version_tail:
