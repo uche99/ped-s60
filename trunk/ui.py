@@ -1834,7 +1834,7 @@ class SettingsGroup(object):
             pass
 
     def listbox_list(self):
-        return [(unicode(x.title), unicode(x)) for x in self.values()]
+        return [(unicode(x.title), unicode(x)) for x in self.values() if x]
 
     def listbox_click(self, n, owner=None):
         return self.values()[n].edit(owner)
@@ -1950,7 +1950,7 @@ class SettingsTabsWindow(TabbedWindow):
         TabbedWindow.__init__(self, **kwargs)
         self.modal_result = False
         self.tabs = [SettingsTab(title=x.title,
-            group=x) for x in self.group.values() if len(x) > 0]
+            group=x) for x in self.group.values() if x]
         self.current_tab_index = active
         
     def close(self, exit=False):
