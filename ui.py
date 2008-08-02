@@ -539,11 +539,12 @@ class Window(object):
             self.__menu = None
             if self.__modal_event:
                 self.__modal_event.set()
-                # this delay is here to allow the active object that called modal()
-                # to finish; if we're here because the application closes and all
-                # windows are being closed, not letting the AO finish itself would
-                # lead to a crash ("app closed" error)
-                e32.ao_sleep(0.1)
+                # this is to allow the active object that called modal() to be
+                # processed before we return; if we're here because the application
+                # closes and all windows are being closed, not letting the AO to
+                # finish would lead to a crash ("app closed" error), at least on
+                # 2nd edition
+                e32.ao_yield()
             return True
         return False
 
@@ -1832,6 +1833,12 @@ class SettingsGroup(object):
         except IOError:
             pass
 
+    def listbox_list(self):
+        return [(unicode(x.title), unicode(x)) for x in self.values()]
+
+    def listbox_click(self, n, owner=None):
+        return self.values()[n].edit(owner)
+
     def __getitem__(self, name):
         return self.objs[name]
 
@@ -1878,15 +1885,10 @@ class SettingsGroups(SettingsGroup):
     def __init__(self, *args, **kwargs):
         SettingsGroup.__init__(self, *args, **kwargs)
 
-    def edit(self, owner=None):
-        if self.window:
-            self.window.focus = True
-            return False
-        self.window = SettingsGroupsWindow(title=self.title,
-            group=self)
-        r = self.window.modal(owner)
-        self.window = None
-        return r
+    def listbox_click(self, n, owner=None):
+        win = SettingsTabsWindow(title=self.title,
+            group=self, active=n)
+        return win.modal(owner)
 
     def append(self, name, obj):
         if isinstance(obj, SettingsGroup):
@@ -1899,18 +1901,14 @@ class SettingsGroupWindow(Window):
     def __init__(self, **kwargs):
         self.group = pop(kwargs, 'group')
         Window.__init__(self, **kwargs)
-        self.body = Listbox(self.get_list(), self.select_click)
+        self.body = Listbox(self.group.listbox_list(), self.select_click)
         self.menu.append(MenuItem(_('Change'), target=self.select_click))
         self.menu.append(MenuItem(_('Exit'), target=self.exit_click))
         self.modal_result = False
         
-    def get_list(self):
-        return [(unicode(x.title), unicode(x)) \
-            for x in self.group.values() if x]
-        
     def select_click(self):
-        if self.group.values()[self.body.current()].edit(self):
-            self.body.set_list(self.get_list(), self.body.current())
+        if self.group.listbox_click(self.body.current(), self):
+            self.body.set_list(self.group.listbox_list(), self.body.current())
             self.modal_result = True
 
     def close(self, exit=False):
@@ -1932,17 +1930,13 @@ class SettingsTab(WindowTab):
     def __init__(self, **kwargs):
         self.group = pop(kwargs, 'group')
         WindowTab.__init__(self, **kwargs)
-        self.body = Listbox(self.get_list(), self.select_click)
-        self.menu.append(MenuItem(_('Change'), target=self.select_click))
+        self.body = Listbox(self.group.listbox_list(), self.select_click)
+        self.menu.append(MenuItem(_('Open'), target=self.select_click))
         self.menu.append(MenuItem(_('Exit'), target=self.exit_click))
-
-    def get_list(self):
-        return [(unicode(x.title), unicode(x)) \
-            for x in self.group.values() if x]
         
     def select_click(self):
-        if self.group.values()[self.body.current()].edit(self.window):
-            self.body.set_list(self.get_list(), self.body.current())
+        if self.group.listbox_click(self.body.current(), self.window):
+            self.body.set_list(self.group.listbox_list(), self.body.current())
             self.window.modal_result = True
 
     def exit_click(self):
@@ -1969,19 +1963,6 @@ class SettingsTabsWindow(TabbedWindow):
                 win.close(exit=True)
         else:
             TabbedWindow.close(self)
-
-
-class SettingsGroupsWindow(SettingsGroupWindow):
-    def __init__(self, **kwargs):
-        SettingsGroupWindow.__init__(self, **kwargs)
-        self.menu[0].title = _('Open') # replaces 'Change'
-
-    def select_click(self):
-        win = SettingsTabsWindow(title=self.title,
-            group=self.group,
-            active=self.body.current())
-        if win.modal(self):
-            self.modal_result = True
 
 
 class Translator(object):
