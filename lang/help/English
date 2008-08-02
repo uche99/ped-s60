@@ -43,7 +43,7 @@ So called text windows are all windows displaying text, including this help wind
 A text window also assigns special functions to some keys.
 
 * Select - inserts a new-line, same as Enter if you have a full keyboard.
-* Green-Up/Down - moves one page up/down (see the [Text tab] page of [Settings] dialog for additional information on how to make this function work properly).
+* Green-Up/Down - moves one page up/down (see the [Text group] of the [Settings] dialog for additional information on how to make this function work properly).
 * Green-Left/Right - moves to the start/end of a line.
 
 $$ Editor
@@ -60,7 +60,7 @@ $$ Python editor
 
 Python editor window is shown after opening a *.py file or creating a new such file. It is based on the [Editor] window and provides all its features. Additionaly it makes editing a Python code on the phone a bit easier.
 
-A smart auto-indentation feature is available with a configurable indentation size (see the [Python tab] of the [Settings] dialog).
+A smart auto-indentation feature is available with a configurable indentation size (see the [Python group] of the [Settings] dialog).
 
 The Green-Select key shortcut triggers the [Autocomplete] feature which lets you type much faster.
 
@@ -78,7 +78,7 @@ Python Shell is an interactive Python console replacing (together with the [Run 
 
 The shell features a true, IDLE-like commands history. Multiline commands like loops, classes or functions are also supported. To browse the history you can use the History function in the Options menu or Green-Up/Down key shortcuts. You can also scroll back and click on any line to copy it to the prompt.
 
-A smart auto-indentation feature is available. The indentation size can be configured in the [Python tab] of the [Settings] dialog.
+A smart auto-indentation feature is available. The indentation size can be configured in the [Python group] of the [Settings] dialog.
 
 The Green-Select key shortcut triggers the [Autocomplete] feature which lets you type much faster.
 
@@ -92,19 +92,19 @@ The commands history by default contains a command to start a Bluetoth console.
 
 $$ Settings
 
-The settings dialog is opened by selecting Settings from the Tools menu (see the [Options] menu). It lets you customize Ped to your needs. Settings dialog is divided into several tabs.
+The settings dialog is opened by selecting Settings from the Tools menu (see the [Options] menu). It lets you customize Ped to your needs. Settings dialog is divided into several groups.
 
-$$$ Main tab
+$$$ Main group
 
-This tab contains global Ped options.
+This group contains global Ped options.
 
 * Language - Ped's user interface language. Application restart is required after changing.
 
 * Global shortcuts - global keyboard [Shortcuts]. Shortcuts defined here apply to all Ped windows including the desktop.
 
-$$$ Text tab
+$$$ Text group
 
-This tab contains options for every Ped window which displays text, including [Editor], [Python editor] and [Python Shell].
+This group contains options for every Ped window which displays text, including [Editor], [Python editor] and [Python Shell].
 
 * Font name - name of the font.
 
@@ -122,35 +122,35 @@ This tab contains options for every Ped window which displays text, including [E
 
 * Page size (landscape) - number of text lines on a screen when in landscape mode.
 
-* Text shortcuts - text keyboard [Shortcuts]. These shortcuts are added to the text windows on top of the global shortcuts defined in the [Main tab].
+* Text shortcuts - text keyboard [Shortcuts]. These shortcuts are added to the text windows on top of the global shortcuts defined in the [Main group].
 
-$$$ File tab
+$$$ File group
 
-This tab contains options for Ped windows which are used to edit files, including [Editor] and [Python editor].
+This group contains options for Ped windows which are used to edit files, including [Editor] and [Python editor].
 
 * Default encoding - new files are saved using this encoding.
 
 * Autosave - if not set to "Off", causes the files to be automatically saved in given time intervals. Doesn't apply to new files which were not manually saved yet.
 
-* Text file shortcuts - file editor keybord [Shortcuts]. These shortcuts are added to the editor window on top of the shortcuts defined in the [Text tab].
+* Text file shortcuts - file editor keybord [Shortcuts]. These shortcuts are added to the editor window on top of the shortcuts defined in the [Text group].
 
-$$$ Python tab
+$$$ Python group
 
-This tab contains all Python specific options.
+This group contains all Python specific options.
 
 * Ask for arguments - if enabled, Ped will ask for arguments every time a script is run.
 
-* Shell font color - color of text in [Python Shell]. This overrides the Font color setting in the [Text tab].
+* Shell font color - color of text in [Python Shell]. This overrides the Font color setting in the [Text group].
 
 * Indentation size - number of space chars inserted by the auto-indentation feature.
 
-* Python file shortcuts - [Python editor] keyboard [Shortcuts]. These shortcuts are added to the Python editor window on top of the shortcuts defined in the [File tab].
+* Python file shortcuts - [Python editor] keyboard [Shortcuts]. These shortcuts are added to the Python editor window on top of the shortcuts defined in the [File group].
 
-* Python shell shortcuts - [Python Shell] keyboard [Shortcuts]. These shortcuts are added to the Python Shell window on top of the shortcuts defined in the [Text tab].
+* Python shell shortcuts - [Python Shell] keyboard [Shortcuts]. These shortcuts are added to the Python Shell window on top of the shortcuts defined in the [Text group].
 
-$$$ Plugins tab
+$$$ Plugins group
 
-This tab is normally hidden. It is shown if plugins add some options to it. Refer to plugins help files for more information. Read the [Plugins] section to learn more about plugins.
+This group is normally hidden. It is shown if plugins add some options to it. Refer to plugins help files for more information. Read the [Plugins] section to learn more about plugins.
 
 $$ Plugins
 
@@ -187,11 +187,11 @@ Ped features a fully customizable keyboard shortcuts. All shortcuts always consi
 
 In the [Settings] you will find five different sets of keyboard shortcuts you can configure.
 
-* Global shortcuts in the [Main tab].
-* Text shortcuts in the [Text tab].
-* File shortcuts in the [File tab].
-* Python file shortcuts in the [Python tab].
-* Python shell shortcuts in the [Python tab].
+* Global shortcuts in the [Main group].
+* Text shortcuts in the [Text group].
+* File shortcuts in the [File group].
+* Python file shortcuts in the [Python group].
+* Python shell shortcuts in the [Python group].
 
 Only a handful of options can be assigned to the Global shortcuts. However, these shortcuts work throughout the application.
 
