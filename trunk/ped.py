@@ -2422,7 +2422,7 @@ class Application(object):
     def start_plugins(self):
         plugins_path = os.path.join(self.path, 'plugins')
         self.started_plugins = {}
-        slen = len(self.settings.allkeys())
+        allkeys = self.settings.allkeys()
 
         for name in os.listdir(plugins_path):
             path = os.path.join(plugins_path, name)
@@ -2454,7 +2454,7 @@ class Application(object):
                 print_exc()
                 ui.note(_('Starting "%s" plugin failed, skipping') % name.decode('utf8'), 'error')
 
-        if len(self.settings.allkeys()) != slen:
+        if self.settings.allkeys() != allkeys:
             # plugins have added/removed the settings;
             # reload so the new settings are loaded too
             self.settings.try_to_load()
