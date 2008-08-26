@@ -1383,7 +1383,7 @@ class PythonFileWindow(TextFileWindow, PythonModifier):
             if m not in modules:
                 del sys.modules[m]
         sys.argv, sys.path, sys.modules = mysys
-        shell.focus = True
+        shell = StdIOWrapper.shell()
         shell.lock(False)
         ui.screen.redraw()
         shell.enable_prompt(True)
@@ -2609,7 +2609,7 @@ class Application(object):
                     del sys.modules[m]
             sys.argv, sys.path = mysys
             TextFileWindow.clear_session()
-            shell.focus = True
+            shell = StdIOWrapper.shell()
             shell.lock(False)
             ui.screen.redraw()
             shell.enable_prompt(True)
